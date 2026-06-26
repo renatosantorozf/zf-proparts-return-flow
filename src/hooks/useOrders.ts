@@ -20,17 +20,15 @@ interface UseOrdersResult {
 }
 
 function groupRows(rows: OrderRow[]): OrderPreview[] {
-  const map = new Map<string, OrderPreview>()
+  const orderMap = new Map<string, OrderPreview>()
+
   for (const row of rows) {
     const id = row.id_sales_order
-    if (!map.has(id)) {
-      // Normaliza veículo (pode ser JSON)
+    if (!orderMap.has(id)) {
       const veiculoFormatado = formatarVeiculo(row.order_vehicle ?? '')
-      // Normaliza NF (pode ser chave XML completa ou número)
       const nfRaw = row.item_nota_fiscal ?? ''
       const { numero: numeroNF, chave: chaveNF } = extrairNumeroNF(nfRaw)
-
-      map.set(id, {
+      orderMap.set(id, {
         id_sales_order: id,
         company_name: row.company_name ?? '',
         company_cnpj: row.company_cnpj ?? '',
@@ -45,16 +43,32 @@ function groupRows(rows: OrderRow[]): OrderPreview[] {
         sellers: [],
       })
     }
-    const preview = map.get(id)!
+    const preview = orderMap.get(id)!
     const sellerRef = row.merchant_reference ?? ''
     let sg = preview.sellers.find(s => s.merchant_reference === sellerRef)
     if (!sg) {
       sg = { merchant_reference: sellerRef, merchant_name: row.merchant_name ?? '', items: [] }
       preview.sellers.push(sg)
     }
-    sg.items.push(row)
+
+    // Consolida linhas do mesmo SKU no mesmo seller
+    // Soma quantidades e agrupa estados
+    const existingItem = sg.items.find((i: OrderRow) => i.item_sku === row.item_sku)
+    if (existingItem) {
+      // Soma a quantidade
+      existingItem.item_quantity = (existingItem.item_quantity ?? 0) + (row.item_quantity ?? 0)
+      // Agrega estados únicos
+      const existingStates = String(existingItem.item_state ?? '').split(',').map(s => s.trim())
+      const newState = String(row.item_state ?? '').trim()
+      if (newState && !existingStates.includes(newState)) {
+        existingItem.item_state = [...existingStates, newState].filter(Boolean).join(', ')
+      }
+    } else {
+      sg.items.push({ ...row })
+    }
   }
-  return Array.from(map.values())
+
+  return Array.from(orderMap.values())
 }
 
 function detectSearchType(q: string): 'order_id' | 'cnpj' | 'company' {
