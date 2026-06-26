@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
+interface SyncLogRow {
+  synced_at: string
+}
+
 export function useSyncStatus() {
   const [lastSync, setLastSync] = useState<Date | null>(null)
   const [syncAge, setSyncAge] = useState('')
@@ -15,8 +19,9 @@ export function useSyncStatus() {
         .order('synced_at', { ascending: false })
         .limit(1)
         .maybeSingle()
-      if (data && 'synced_at' in data) {
-        setLastSync(new Date(data.synced_at as string))
+      const row = data as SyncLogRow | null
+      if (row?.synced_at) {
+        setLastSync(new Date(row.synced_at))
       }
     }
     fetchLastSync()
