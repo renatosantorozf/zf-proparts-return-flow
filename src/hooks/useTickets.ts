@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { db } from '@/lib/db'
 import type { Ticket, TicketItem, TicketLog, TicketStatus } from '@/types'
 
 export function useTickets() {
@@ -9,12 +10,12 @@ export function useTickets() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await (supabase
+    const { data, error } = await db
       .from('tickets')
       .select('*')
-      .order('created_at', { ascending: false }) as any)
+      .order('created_at', { ascending: false })
     if (error) setError(error.message)
-    else setTickets(data ?? [])
+    else setTickets((data ?? []) as Ticket[])
     setLoading(false)
   }, [])
 
@@ -33,13 +34,13 @@ export function useTicket(id: string) {
     if (!id) return
     setLoading(true)
     const [tRes, iRes, lRes] = await Promise.all([
-      (supabase.from('tickets').select('*').eq('id', id).single() as any),
-      (supabase.from('ticket_items').select('*').eq('ticket_id', id) as any),
-      (supabase.from('ticket_logs').select('*').eq('ticket_id', id).order('created_at') as any),
+      db.from('tickets').select('*').eq('id', id).single(),
+      db.from('ticket_items').select('*').eq('ticket_id', id),
+      db.from('ticket_logs').select('*').eq('ticket_id', id).order('created_at'),
     ])
-    setTicket(tRes.data ?? null)
-    setItems(iRes.data ?? [])
-    setLogs(lRes.data ?? [])
+    setTicket((tRes.data ?? null) as Ticket | null)
+    setItems((iRes.data ?? []) as TicketItem[])
+    setLogs((lRes.data ?? []) as TicketLog[])
     setLoading(false)
   }, [id])
 
@@ -49,29 +50,29 @@ export function useTicket(id: string) {
 }
 
 export async function createTicket(
-  ticketData: Omit<Ticket, 'id' | 'ticket_number' | 'created_at' | 'updated_at'>,
-  items: Omit<TicketItem, 'id' | 'ticket_id'>[]
+  ticketData: Record<string, unknown>,
+  items: Record<string, unknown>[]
 ): Promise<{ id: string } | null> {
-  const { data, error } = await (supabase
+  const { data, error } = await db
     .from('tickets')
     .insert(ticketData)
     .select('id')
-    .single() as any)
+    .single()
 
   if (error || !data) {
     console.error('Erro ao criar ticket:', error)
     return null
   }
 
-  const ticketId = data.id
+  const ticketId = (data as { id: string }).id
 
   if (items.length > 0) {
-    await (supabase.from('ticket_items').insert(
+    await db.from('ticket_items').insert(
       items.map(i => ({ ...i, ticket_id: ticketId }))
-    ) as any)
+    )
   }
 
-  await addLog(ticketId, 'sistema', `Ticket criado`)
+  await addLog(ticketId, 'sistema', 'Ticket criado')
   return { id: ticketId }
 }
 
@@ -80,10 +81,10 @@ export async function updateTicketStatus(
   newStatus: TicketStatus,
   userId?: string
 ): Promise<boolean> {
-  const { error } = await (supabase
+  const { error } = await db
     .from('tickets')
     .update({ status: newStatus, updated_at: new Date().toISOString() })
-    .eq('id', ticketId) as any)
+    .eq('id', ticketId)
 
   if (error) return false
   await addLog(ticketId, 'sistema', `Status alterado para: ${newStatus}`, userId)
@@ -96,10 +97,10 @@ export async function addLog(
   mensagem: string,
   userId?: string
 ): Promise<void> {
-  await (supabase.from('ticket_logs').insert({
+  await db.from('ticket_logs').insert({
     ticket_id: ticketId,
     tipo,
     mensagem,
     created_by: userId ?? null,
-  }) as any)
+  })
 }
