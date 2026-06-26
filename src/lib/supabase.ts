@@ -1,18 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
-// Vite injeta VITE_* em import.meta.env no build
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const meta = import.meta as any
-const supabaseUrl: string = meta.env?.VITE_SUPABASE_URL ?? ''
-const supabaseAnonKey: string = meta.env?.VITE_SUPABASE_ANON_KEY ?? ''
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Variáveis de ambiente Supabase não configuradas.\n' +
-    'Copie .env.example para .env.local e preencha as credenciais.'
-  )
-}
+// Chaves cravadas direto no código para ignorar problemas de cache do Cloudflare
+const supabaseUrl: string = 'https://bklyhayqtnydxxvlgthk.supabase.co'
+const supabaseAnonKey: string = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrbHloYXlxdG55ZHh4dmxndGhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MzE3NjksImV4cCI6MjA5ODAwNzc2OX0.Y1V3zKu2RpMVrnKeht2S2j5TzHYOh9OVOlWdGLsarhs'
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
