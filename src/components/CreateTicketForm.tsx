@@ -1,16 +1,22 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { createTicket } from '@/hooks/useTickets'
 import { useMei } from '@/hooks/useMei'
 import { getSellerByRef } from '@/hooks/useSellers'
 import type { OrderPreview, TicketItem, TicketTipo, TicketSubtipo, CanalEntrada } from '@/types'
+
+export interface TicketDraft {
+  tipo: TicketTipo
+  subtipo: TicketSubtipo | ''
+  canal: CanalEntrada
+  motivo: string
+  chaveXml: string
+}
 
 interface CreateTicketFormProps {
   order: OrderPreview
   selectedItems: Omit<TicketItem, 'id' | 'ticket_id'>[]
   devolucaoTipo: 'total' | 'parcial'
-  valorTotal: number
+  onConfirm: (draft: TicketDraft) => void
   onBack: () => void
 }
 
@@ -21,10 +27,9 @@ function canalPlaybookParaEntrada(canal: string | null | undefined): CanalEntrad
 }
 
 export function CreateTicketForm({
-  order, selectedItems, devolucaoTipo, valorTotal, onBack
+  order, selectedItems, devolucaoTipo, onConfirm, onBack
 }: CreateTicketFormProps) {
-  const { user } = useAuth()
-  const navigate = useNavigate()
+  const { user: _user } = useAuth()
   const { status: meiStatus } = useMei(order.company_cnpj)
 
   const [tipo, setTipo] = useState<TicketTipo>('devolucao')
@@ -32,17 +37,14 @@ export function CreateTicketForm({
   const [motivo, setMotivo] = useState('')
   const [canal, setCanal] = useState<CanalEntrada>('whatsapp_individual')
   const [chaveXml, setChaveXml] = useState(order.chave_xml_nf ?? '')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sellerNome, setSellerNome] = useState<string>('')
   const [canalPreenchido, setCanalPreenchido] = useState(false)
 
-  // Seller correto = seller do PRIMEIRO ITEM SELECIONADO, não order.sellers[0]
   const sellerDoItem = selectedItems[0]
   const merchantReference = sellerDoItem?.merchant_reference ?? null
   const merchantName = sellerDoItem?.merchant_name ?? null
 
-  // Pré-seleciona canal do playbook do seller correto
   useEffect(() => {
     if (!merchantReference) return
     getSellerByRef(merchantReference).then(s => {
@@ -54,55 +56,14 @@ export function CreateTicketForm({
     })
   }, [merchantReference])
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Suprimir warning de meiStatus nao usado diretamente
+  void meiStatus
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!motivo.trim()) { setError('Informe o motivo da devolucao'); return }
-    setLoading(true)
-    setError('')
-
-    const ticketData: Record<string, unknown> = {
-      order_id: order.id_sales_order,
-      tipo,
-      subtipo: tipo === 'garantia' && subtipo ? subtipo : null,
-      status: 'aberto',
-      canal_entrada: canal,
-      motivo: motivo.trim(),
-      company_name: order.company_name,
-      company_cnpj: order.company_cnpj,
-      customer_email: order.customer_email,
-      order_city: order.order_city,
-      order_state: order.order_state,
-      order_vehicle: order.order_vehicle,
-      // Seller vem do item selecionado, nao do primeiro seller do pedido
-      merchant_reference: merchantReference,
-      merchant_name: merchantName,
-      numero_nf: order.numero_nf || null,
-      chave_xml_nf: chaveXml || null,
-      mei_status: meiStatus,
-      devolucao_tipo: devolucaoTipo,
-      valor_total_devolucao: valorTotal,
-      created_by: user?.id ?? null,
-      data_solicitacao: new Date().toISOString().split('T')[0],
-      order_created_at: order.order_created_at || null,
-    }
-
-    const items = selectedItems.map(i => ({
-      item_sku: i.item_sku,
-      item_brand: i.item_brand ?? null,
-      item_part_number: i.item_part_number ?? null,
-      item_name: i.item_name ?? null,
-      item_net_price: i.item_net_price ?? null,
-      qtd_original: i.qtd_original,
-      qtd_devolvida: i.qtd_devolvida,
-      valor_devolvido: i.valor_devolvido ?? null,
-      merchant_reference: i.merchant_reference ?? null,
-      merchant_name: i.merchant_name ?? null,
-    }))
-
-    const result = await createTicket(ticketData, items)
-    setLoading(false)
-    if (!result) { setError('Erro ao criar ticket. Tente novamente.'); return }
-    navigate(`/tickets/${result.id}`)
+    if (!motivo.trim()) { setError('Informe o motivo'); return }
+    // Passa para revisao — NAO salva ainda
+    onConfirm({ tipo, subtipo, canal, motivo: motivo.trim(), chaveXml })
   }
 
   const CANAIS: { value: CanalEntrada; label: string }[] = [
@@ -114,20 +75,15 @@ export function CreateTicketForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Resumo */}
       <div className="card p-4 bg-gray-50 space-y-1">
-        <p className="text-xs text-gray-500">Criando ticket para</p>
-        <p className="font-bold text-gray-900">#{order.id_sales_order} · {order.company_name}</p>
-        <p className="text-sm text-gray-600">
-          Seller: <span className="font-medium">{merchantName || '—'}</span>
-        </p>
+        <p className="text-xs text-gray-500">Pedido #{order.id_sales_order} · {order.company_name}</p>
+        <p className="text-sm font-medium text-gray-800">Seller: {merchantName || '—'}</p>
         <p className="text-sm text-gray-600">
           {selectedItems.length} {selectedItems.length === 1 ? 'item' : 'itens'} ·{' '}
           {devolucaoTipo === 'total' ? 'Devolucao total' : 'Devolucao parcial'}
         </p>
       </div>
 
-      {/* Tipo */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">Tipo *</label>
         <div className="flex gap-3">
@@ -154,7 +110,6 @@ export function CreateTicketForm({
         </div>
       )}
 
-      {/* Canal */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Canal de entrada *
@@ -167,9 +122,7 @@ export function CreateTicketForm({
         <div className="grid grid-cols-2 gap-2">
           {CANAIS.map(({ value, label }) => (
             <label key={value} className={'flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors text-sm ' +
-              (canal === value
-                ? 'border-zf-blue bg-zf-blue-light text-zf-blue font-medium'
-                : 'border-gray-200 hover:border-gray-300 text-gray-700')}>
+              (canal === value ? 'border-zf-blue bg-zf-blue-light text-zf-blue font-medium' : 'border-gray-200 hover:border-gray-300 text-gray-700')}>
               <input type="radio" name="canal" value={value} checked={canal === value}
                 onChange={() => setCanal(value)} className="sr-only" />
               {label}
@@ -178,15 +131,12 @@ export function CreateTicketForm({
         </div>
       </div>
 
-      {/* Motivo */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Motivo da devolucao *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Motivo *</label>
         <textarea value={motivo} onChange={e => setMotivo(e.target.value)}
-          className="input resize-none" rows={3}
-          placeholder="Descreva o motivo..." autoFocus />
+          className="input resize-none" rows={3} placeholder="Descreva o motivo..." autoFocus />
       </div>
 
-      {/* Chave XML */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Chave XML da NF-e <span className="text-gray-400 font-normal">(opcional)</span>
@@ -205,8 +155,8 @@ export function CreateTicketForm({
 
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onBack} className="btn-secondary flex-1">← Voltar</button>
-        <button type="submit" disabled={loading || !motivo.trim()} className="btn-primary flex-1">
-          {loading ? 'Criando...' : 'Criar Ticket'}
+        <button type="submit" disabled={!motivo.trim()} className="btn-primary flex-1">
+          Revisar →
         </button>
       </div>
     </form>
