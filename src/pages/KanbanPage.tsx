@@ -44,7 +44,10 @@ function KanbanCard({ ticket, getSlaInfo, onClick }: {
       className={`bg-white rounded-lg border border-gray-200 border-l-4 ${borderColor} p-3 cursor-pointer hover:shadow-md transition-shadow space-y-2`}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="font-mono text-xs font-bold text-zf-blue">#{ticket.order_id}</span>
+        <div>
+          <span className="font-mono text-xs font-bold text-zf-blue">T#{ticket.ticket_number}</span>
+          <span className="text-xs text-gray-400 ml-1">· Pedido #{ticket.order_id}</span>
+        </div>
         <div className="flex items-center gap-1">
           <span className={`badge text-xs ${ticket.tipo === 'garantia' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
             {ticket.tipo === 'garantia' ? 'G' : 'D'}
