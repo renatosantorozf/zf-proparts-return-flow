@@ -1,7 +1,13 @@
 import * as XLSX from 'xlsx'
-import { supabase } from './supabase'
+import { createClient } from '@supabase/supabase-js'
 
-const COL = {
+// Cliente sem tipagem genérica — necessário para upsert de dados dinâmicos do xlsx
+// O cliente tipado (src/lib/supabase.ts) continua sendo usado no resto da app
+const supabaseUrl = 'https://bklyhayqtnydxxvlgthk.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrbHloYXlxdG55ZHh4dmxndGhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MzE3NjksImV4cCI6MjA5ODAwNzc2OX0.Y1V3zKu2RpMVrnKeht2S2j5TzHYOh9OVOlWdGLsarhs'
+const db = createClient(supabaseUrl, supabaseKey)
+
+const COL: Record<string, number> = {
   id_sales_order:             0,
   customer_first_name:        1,
   customer_last_name:         2,
@@ -40,6 +46,7 @@ const COL = {
   order_created_at:           35,
   order_paid_date:            36,
   store:                      37,
+  item_chave_xml_nf:          38, // PAD-01 — coluna futura
 }
 
 export interface ParseResult {
@@ -47,6 +54,13 @@ export interface ParseResult {
   totalRows: number
   skippedRows: number
   errors: string[]
+}
+
+function str(v: unknown): string | null {
+  return v != null ? String(v) : null
+}
+function num(v: unknown): number | null {
+  return v != null && !isNaN(Number(v)) ? Number(v) : null
 }
 
 export function parseOrderXlsx(buffer: ArrayBuffer): ParseResult {
@@ -66,64 +80,52 @@ export function parseOrderXlsx(buffer: ArrayBuffer): ParseResult {
     if (!Array.isArray(row)) { skippedRows++; continue }
 
     const orderId = row[COL.id_sales_order]
-    const itemSku = row[COL.item_sku]
-
+    const itemSku  = row[COL.item_sku]
     if (!orderId || !itemSku) { skippedRows++; continue }
 
     try {
       rows.push({
-        id_sales_order:             String(orderId),
-        customer_first_name:        row[COL.customer_first_name] ?? null,
-        customer_last_name:         row[COL.customer_last_name] ?? null,
-        customer_email:             row[COL.customer_email] ?? null,
-        company_name:               row[COL.company_name] ?? null,
+        id_sales_order:             str(orderId),
+        customer_first_name:        str(row[COL.customer_first_name]),
+        customer_last_name:         str(row[COL.customer_last_name]),
+        customer_email:             str(row[COL.customer_email]),
+        company_name:               str(row[COL.company_name]),
         company_cnpj:               row[COL.company_cnpj]
-                                      ? String(row[COL.company_cnpj]).replace(/\D/g, '')
+                                      ? str(row[COL.company_cnpj])!.replace(/\D/g, '')
                                       : null,
-        order_address1:             row[COL.order_address1] ?? null,
-        order_address2:             row[COL.order_address2] ?? null,
-        order_address3:             row[COL.order_address3] ?? null,
-        order_city:                 row[COL.order_city] ?? null,
-        order_state:                row[COL.order_state] ?? null,
-        order_zip_code:             row[COL.order_zip_code] ?? null,
-        order_payment_method:       row[COL.order_payment_method] ?? null,
-        order_installments:         row[COL.order_installments] ?? null,
-        order_vehicle:              row[COL.order_vehicle] ?? null,
-        item_sku:                   String(itemSku),
-        item_brand:                 row[COL.item_brand] ?? null,
-        item_part_number:           row[COL.item_part_number] ?? null,
-        item_name:                  row[COL.item_name] ?? null,
-        item_net_price:             row[COL.item_net_price] != null
-                                      ? Number(row[COL.item_net_price]) : null,
-        item_quantity:              row[COL.item_quantity] != null
-                                      ? Number(row[COL.item_quantity]) : null,
-        item_state:                 row[COL.item_state] ?? null,
-        item_merchant_state:        row[COL.item_merchant_state] ?? null,
-        merchant_reference:         row[COL.merchant_reference] != null
-                                      ? String(row[COL.merchant_reference]) : null,
-        merchant_name:              row[COL.merchant_name] ?? null,
-        item_discount_display_name: row[COL.item_discount_display_name] ?? null,
-        item_discount_value:        row[COL.item_discount_value] != null
-                                      ? Number(row[COL.item_discount_value]) : null,
-        item_nota_fiscal:           row[COL.item_nota_fiscal] != null
-                                      ? String(row[COL.item_nota_fiscal]) : null,
-        item_refunded_date:         row[COL.item_refunded_date] ?? null,
-        order_canceled_total:       row[COL.order_canceled_total] != null
-                                      ? Number(row[COL.order_canceled_total]) : null,
-        order_discount_total:       row[COL.order_discount_total] != null
-                                      ? Number(row[COL.order_discount_total]) : null,
-        order_expense_total:        row[COL.order_expense_total] != null
-                                      ? Number(row[COL.order_expense_total]) : null,
-        order_grand_total:          row[COL.order_grand_total] != null
-                                      ? Number(row[COL.order_grand_total]) : null,
-        order_shipment_method_name: row[COL.order_shipment_method_name] ?? null,
-        order_settlement_date:      row[COL.order_settlement_date] ?? null,
-        order_created_at:           row[COL.order_created_at] != null
-                                      ? String(row[COL.order_created_at]) : null,
-        order_paid_date:            row[COL.order_paid_date] != null
-                                      ? String(row[COL.order_paid_date]) : null,
-        store:                      row[COL.store] ?? null,
-        item_chave_xml_nf:          row[38] != null ? String(row[38]) : null,
+        order_address1:             str(row[COL.order_address1]),
+        order_address2:             str(row[COL.order_address2]),
+        order_address3:             str(row[COL.order_address3]),
+        order_city:                 str(row[COL.order_city]),
+        order_state:                str(row[COL.order_state]),
+        order_zip_code:             str(row[COL.order_zip_code]),
+        order_payment_method:       str(row[COL.order_payment_method]),
+        order_installments:         str(row[COL.order_installments]),
+        order_vehicle:              str(row[COL.order_vehicle]),
+        item_sku:                   str(itemSku),
+        item_brand:                 str(row[COL.item_brand]),
+        item_part_number:           str(row[COL.item_part_number]),
+        item_name:                  str(row[COL.item_name]),
+        item_net_price:             num(row[COL.item_net_price]),
+        item_quantity:              num(row[COL.item_quantity]),
+        item_state:                 str(row[COL.item_state]),
+        item_merchant_state:        str(row[COL.item_merchant_state]),
+        merchant_reference:         str(row[COL.merchant_reference]),
+        merchant_name:              str(row[COL.merchant_name]),
+        item_discount_display_name: str(row[COL.item_discount_display_name]),
+        item_discount_value:        num(row[COL.item_discount_value]),
+        item_nota_fiscal:           str(row[COL.item_nota_fiscal]),
+        item_refunded_date:         str(row[COL.item_refunded_date]),
+        order_canceled_total:       num(row[COL.order_canceled_total]),
+        order_discount_total:       num(row[COL.order_discount_total]),
+        order_expense_total:        num(row[COL.order_expense_total]),
+        order_grand_total:          num(row[COL.order_grand_total]),
+        order_shipment_method_name: str(row[COL.order_shipment_method_name]),
+        order_settlement_date:      str(row[COL.order_settlement_date]),
+        order_created_at:           str(row[COL.order_created_at]),
+        order_paid_date:            str(row[COL.order_paid_date]),
+        store:                      str(row[COL.store]),
+        item_chave_xml_nf:          str(row[COL.item_chave_xml_nf]),
       })
     } catch (e) {
       errors.push(`Linha ${i + 1}: ${e}`)
@@ -141,12 +143,6 @@ export interface UpsertResult {
   duration: number
 }
 
-interface SyncLogInsert {
-  status: string
-  rows_upserted: number
-  error_message: string | null
-}
-
 export async function upsertOrders(rows: Record<string, unknown>[]): Promise<UpsertResult> {
   const BATCH_SIZE = 500
   const start = Date.now()
@@ -155,10 +151,9 @@ export async function upsertOrders(rows: Record<string, unknown>[]): Promise<Ups
 
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE)
-    const { error } = await supabase
+    const { error } = await db
       .from('orders')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .upsert(batch as any[], { onConflict: 'id_sales_order,item_sku' })
+      .upsert(batch, { onConflict: 'id_sales_order,item_sku' })
 
     if (error) {
       errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${error.message}`)
@@ -167,14 +162,11 @@ export async function upsertOrders(rows: Record<string, unknown>[]): Promise<Ups
     }
   }
 
-  const logEntry: SyncLogInsert = {
+  await db.from('sync_log').insert({
     status: errors.length === 0 ? 'success' : 'partial',
     rows_upserted: rowsUpserted,
     error_message: errors.length > 0 ? errors.join('; ') : null,
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await supabase.from('sync_log').insert(logEntry as any)
+  })
 
   return {
     success: errors.length === 0,
