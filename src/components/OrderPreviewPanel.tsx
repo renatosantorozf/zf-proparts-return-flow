@@ -22,7 +22,7 @@ interface ExistingTicket {
 
 interface OrderPreviewPanelProps {
   order: OrderPreview
-  onConfirm: (items: Omit<TicketItem, 'id' | 'ticket_id'>[], devolucaoTipo: 'total' | 'parcial', valorTotal: number) => void
+  onConfirm: (items: Omit<TicketItem, 'id' | 'ticket_id'>[], devolucaoTipo: 'total' | 'parcial') => void
   onCancel: () => void
 }
 
@@ -116,7 +116,7 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
   function handleConfirm() {
     if (selected.length === 0) return
     const items = selected.map(({ selected: _s, _sellerIdx: _si, _rowIdx: _ri, ...rest }) => rest)
-    onConfirm(items, isTotal ? 'total' : 'parcial', 0)
+    onConfirm(items, isTotal ? 'total' : 'parcial')
   }
 
   return (
