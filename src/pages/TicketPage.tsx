@@ -8,6 +8,7 @@ import { formatarMoeda, formatarCNPJ, formatarChaveXML, gerarMensagem, templateP
 import { formatarDataHora } from '@/lib/dateUtils'
 import type { TicketStatus, LogTipo, Seller } from '@/types'
 import { STATUS_LABELS, KANBAN_COLUMNS } from '@/types'
+import { abrirEmailEml } from '@/lib/emailUtils'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function TicketPage() {
@@ -90,15 +91,10 @@ export default function TicketPage() {
   function handleSendEmail() {
     const msg = getMsgPreview()
     const email = seller?.contato_email ?? ''
-    const subject = `Solicitação de Devolução - Pedido ${ticket?.order_id}`
+    const subject = `Solicitação de Devolução - Pedido ZF [pro]Parts #${ticket?.order_id}`
 
-    // Copia para clipboard como fallback universal
-    // mailto pode ter problemas de encoding no Outlook dependendo da configuração
-    navigator.clipboard.writeText(msg).catch(() => {})
-
-    // Abre mailto com window.open para forçar nova janela
-    const mailto = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`
-    window.open(mailto)
+    // Usa .eml para garantir encoding UTF-8 correto no Outlook
+    abrirEmailEml({ to: email, subject, body: msg })
 
     if (id) addLog(id, 'email', `Comunicação gerada via E-mail${email ? ` para ${email}` : ''}`, user?.id).then(refetch)
     setShowMsgModal(false)
