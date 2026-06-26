@@ -7,18 +7,20 @@ export function useSyncStatus() {
   const [isStale, setIsStale] = useState(false)
 
   useEffect(() => {
-    async function fetch() {
+    async function fetchLastSync() {
       const { data } = await supabase
         .from('sync_log')
         .select('synced_at')
         .eq('status', 'success')
         .order('synced_at', { ascending: false })
         .limit(1)
-        .single()
-      if (data) setLastSync(new Date(data.synced_at))
+        .maybeSingle()
+      if (data && 'synced_at' in data) {
+        setLastSync(new Date(data.synced_at as string))
+      }
     }
-    fetch()
-    const interval = setInterval(fetch, 5 * 60 * 1000)
+    fetchLastSync()
+    const interval = setInterval(fetchLastSync, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
 
