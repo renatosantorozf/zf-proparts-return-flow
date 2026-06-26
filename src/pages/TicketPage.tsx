@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Send, RefreshCw, Car, Package, FileText, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Send, RefreshCw, Car, Package, FileText, MessageSquare, Copy, Check } from 'lucide-react'
 import { useTicket, addLog, updateTicketStatus } from '@/hooks/useTickets'
 import { getSellerByRef } from '@/hooks/useSellers'
 import { MeiBadge } from '@/components/MeiBadge'
@@ -16,14 +16,13 @@ export default function TicketPage() {
   const { user } = useAuth()
   const { ticket, items, logs, loading, refetch } = useTicket(id ?? '')
   const [seller, setSeller] = useState<Seller | null>(null)
-
   const [logText, setLogText] = useState('')
   const [logTipo, setLogTipo] = useState<LogTipo>('whatsapp')
   const [savingLog, setSavingLog] = useState(false)
   const [showMsgModal, setShowMsgModal] = useState(false)
   const [msgChannel, setMsgChannel] = useState<'whatsapp' | 'email'>('whatsapp')
+  const [copied, setCopied] = useState(false)
 
-  // Carrega seller do Playbook pelo merchant_reference do ticket
   useEffect(() => {
     if (!ticket?.merchant_reference) return
     getSellerByRef(ticket.merchant_reference).then(s => setSeller(s))
@@ -50,6 +49,7 @@ export default function TicketPage() {
       `  - ${i.item_name} (SKU: ${i.item_sku}) · Qtd: ${i.qtd_devolvida} · ${formatarMoeda(i.valor_devolvido)}`
     ).join('\n')
     return {
+      contato_seller: seller?.contato_nome || seller?.merchant_name || ticket.merchant_name || 'Equipe de Devoluções',
       order_id: ticket.order_id,
       cliente_nome: ticket.company_name ?? '',
       cnpj_cliente: formatarCNPJ(ticket.company_cnpj ?? ''),
@@ -69,16 +69,16 @@ export default function TicketPage() {
   }
 
   function getTemplate(): string {
-    // Usa template do seller se disponível, senão o padrão
     return seller?.template_mensagem || templatePadrao()
   }
 
+  function getMsgPreview(): string {
+    return gerarMensagem(getTemplate(), buildMsgVars())
+  }
+
   function handleSendWhatsApp() {
-    const msg = gerarMensagem(getTemplate(), buildMsgVars())
-    // WhatsApp do seller do Playbook, ou abre sem destinatário
-    const tel = seller?.contato_whatsapp
-      ? seller.contato_whatsapp.replace(/\D/g, '')
-      : ''
+    const msg = getMsgPreview()
+    const tel = seller?.contato_whatsapp ? seller.contato_whatsapp.replace(/\D/g, '') : ''
     const url = tel
       ? `https://wa.me/55${tel}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`
@@ -88,17 +88,26 @@ export default function TicketPage() {
   }
 
   function handleSendEmail() {
-    const msg = gerarMensagem(getTemplate(), buildMsgVars())
+    const msg = getMsgPreview()
     const email = seller?.contato_email ?? ''
     const subject = `Solicitação de Devolução - Pedido ${ticket?.order_id}`
 
-    // Monta mailto com encoding correto para UTF-8
-    // encodeURIComponent garante que acentos não viram lixo
+    // Copia para clipboard como fallback universal
+    // mailto pode ter problemas de encoding no Outlook dependendo da configuração
+    navigator.clipboard.writeText(msg).catch(() => {})
+
+    // Abre mailto com window.open para forçar nova janela
     const mailto = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`
-    window.location.href = mailto
+    window.open(mailto)
 
     if (id) addLog(id, 'email', `Comunicação gerada via E-mail${email ? ` para ${email}` : ''}`, user?.id).then(refetch)
     setShowMsgModal(false)
+  }
+
+  function handleCopyMsg() {
+    navigator.clipboard.writeText(getMsgPreview())
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   if (loading) return (
@@ -116,7 +125,6 @@ export default function TicketPage() {
 
   const canShowNfd = ticket.mei_status === 'nao_mei'
   const canalLabel = ticket.canal_entrada ? String(ticket.canal_entrada).replace(/_/g, ' ') : '—'
-  const msgPreview = gerarMensagem(getTemplate(), buildMsgVars())
 
   return (
     <div className="max-w-4xl space-y-5">
@@ -135,6 +143,7 @@ export default function TicketPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-4">
+
           {/* Dados do pedido */}
           <div className="card p-5 space-y-4">
             <h2 className="font-semibold text-gray-800 flex items-center gap-2"><Package size={16} /> Dados do Pedido</h2>
@@ -165,11 +174,9 @@ export default function TicketPage() {
           </div>
 
           {/* Playbook do seller */}
-          {seller && (seller.instrucoes || seller.contato_whatsapp || seller.contato_email || seller.url_formulario) && (
+          {seller && (seller.instrucoes || seller.url_formulario) && (
             <div className="card p-5 space-y-3 border-l-4 border-zf-blue">
-              <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
-                📋 Processo — {seller.merchant_name}
-              </h2>
+              <h2 className="font-semibold text-gray-800 text-sm">📋 Processo — {seller.merchant_name}</h2>
               {seller.instrucoes && (
                 <div className="bg-blue-50 rounded-lg p-3">
                   <p className="text-sm text-blue-900 whitespace-pre-wrap">{seller.instrucoes}</p>
@@ -191,7 +198,7 @@ export default function TicketPage() {
           )}
           {seller && !seller.instrucoes && !seller.contato_whatsapp && !seller.contato_email && (
             <div className="card p-4 border border-amber-200 bg-amber-50">
-              <p className="text-sm text-amber-800 flex items-center gap-2">
+              <p className="text-sm text-amber-800">
                 ⚠️ Playbook do seller não configurado —{' '}
                 <a href="/playbook" className="underline font-medium">completar cadastro</a>
               </p>
@@ -267,22 +274,25 @@ export default function TicketPage() {
         <div className="space-y-4">
           <div className="card p-4 space-y-3">
             <h3 className="font-semibold text-gray-800 text-sm">Comunicar com Seller</h3>
+            {seller?.contato_nome && (
+              <p className="text-xs text-gray-600 font-medium">{seller.contato_nome}</p>
+            )}
             {seller?.contato_whatsapp && (
-              <p className="text-xs text-gray-500">📱 {seller.contato_nome || seller.merchant_name} · {seller.contato_whatsapp}</p>
+              <p className="text-xs text-gray-500">📱 {seller.contato_whatsapp}</p>
             )}
             {seller?.contato_email && (
               <p className="text-xs text-gray-500">✉️ {seller.contato_email}</p>
             )}
             {!seller?.contato_whatsapp && !seller?.contato_email && (
-              <p className="text-xs text-amber-600">⚠️ Contatos não cadastrados no Playbook</p>
+              <p className="text-xs text-amber-600">⚠️ Contatos não cadastrados —{' '}
+                <a href="/playbook" className="underline">completar</a>
+              </p>
             )}
-            <button
-              onClick={() => { setMsgChannel('whatsapp'); setShowMsgModal(true) }}
+            <button onClick={() => { setMsgChannel('whatsapp'); setShowMsgModal(true) }}
               className="btn-primary w-full text-sm flex items-center justify-center gap-2">
               <Send size={14} /> Enviar WhatsApp
             </button>
-            <button
-              onClick={() => { setMsgChannel('email'); setShowMsgModal(true) }}
+            <button onClick={() => { setMsgChannel('email'); setShowMsgModal(true) }}
               className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
               <Send size={14} /> Enviar E-mail
             </button>
@@ -317,27 +327,35 @@ export default function TicketPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg space-y-4 p-6">
             <div>
               <h3 className="font-bold text-gray-900">Pré-visualização da mensagem</h3>
-              {msgChannel === 'email' && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Para: <span className="font-medium">{seller?.contato_email || '(sem e-mail cadastrado)'}</span>
-                </p>
-              )}
-              {msgChannel === 'whatsapp' && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Para: <span className="font-medium">{seller?.contato_whatsapp || '(sem WhatsApp cadastrado)'}</span>
-                </p>
-              )}
+              <p className="text-xs text-gray-500 mt-1">
+                {msgChannel === 'email'
+                  ? <>Para: <span className="font-medium">{seller?.contato_email || '(sem e-mail cadastrado)'}</span></>
+                  : <>Para: <span className="font-medium">{seller?.contato_whatsapp || '(sem WhatsApp cadastrado)'}</span></>
+                }
+              </p>
             </div>
             <pre className="bg-gray-50 rounded-lg p-4 text-xs text-gray-700 whitespace-pre-wrap overflow-auto max-h-72 font-sans leading-relaxed">
-              {msgPreview}
+              {getMsgPreview()}
             </pre>
-            <div className="flex gap-3">
-              <button onClick={() => setShowMsgModal(false)} className="btn-secondary flex-1 text-sm">Cancelar</button>
-              <button
-                onClick={msgChannel === 'whatsapp' ? handleSendWhatsApp : handleSendEmail}
-                className="btn-primary flex-1 text-sm">
-                {msgChannel === 'whatsapp' ? '📱 Abrir WhatsApp' : '📧 Abrir E-mail'}
+            <div className="space-y-2">
+              <div className="flex gap-3">
+                <button onClick={() => setShowMsgModal(false)} className="btn-secondary flex-1 text-sm">Cancelar</button>
+                <button
+                  onClick={msgChannel === 'whatsapp' ? handleSendWhatsApp : handleSendEmail}
+                  className="btn-primary flex-1 text-sm">
+                  {msgChannel === 'whatsapp' ? '📱 Abrir WhatsApp' : '📧 Abrir E-mail'}
+                </button>
+              </div>
+              {/* Fallback: copiar mensagem para clipboard */}
+              <button onClick={handleCopyMsg}
+                className="w-full btn-ghost text-xs flex items-center justify-center gap-1.5 text-gray-500">
+                {copied ? <><Check size={12} className="text-green-500" /> Copiado!</> : <><Copy size={12} /> Copiar mensagem</>}
               </button>
+              {msgChannel === 'email' && (
+                <p className="text-xs text-center text-gray-400">
+                  Se o e-mail abrir com caracteres estranhos, use "Copiar mensagem" e cole manualmente.
+                </p>
+              )}
             </div>
           </div>
         </div>
