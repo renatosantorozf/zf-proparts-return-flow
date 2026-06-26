@@ -40,14 +40,22 @@ function groupRows(rows: OrderRow[]): OrderPreview[] {
     }
     const preview = map.get(id)!
     const sellerRef = row.merchant_reference ?? ''
-    let sellerGroup = preview.sellers.find(s => s.merchant_reference === sellerRef)
-    if (!sellerGroup) {
-      sellerGroup = { merchant_reference: sellerRef, merchant_name: row.merchant_name ?? '', items: [] }
-      preview.sellers.push(sellerGroup)
+    let sg = preview.sellers.find(s => s.merchant_reference === sellerRef)
+    if (!sg) {
+      sg = { merchant_reference: sellerRef, merchant_name: row.merchant_name ?? '', items: [] }
+      preview.sellers.push(sg)
     }
-    sellerGroup.items.push(row)
+    sg.items.push(row)
   }
   return Array.from(map.values())
+}
+
+// Detecta o tipo de busca pelo conteúdo digitado
+function detectSearchType(q: string): 'order_id' | 'cnpj' | 'company' {
+  const clean = q.replace(/\D/g, '')
+  if (/^\d+$/.test(q.trim()) && q.trim().length >= 6) return 'order_id'
+  if (clean.length === 14) return 'cnpj'
+  return 'company'
 }
 
 export function useOrders({
@@ -69,7 +77,18 @@ export function useOrders({
       try {
         let q = db.from('orders').select('id_sales_order', { count: 'exact' })
 
-        if (search) q = q.ilike('id_sales_order', `%${search}%`)
+        if (search.trim()) {
+          const type = detectSearchType(search.trim())
+          if (type === 'order_id') {
+            q = q.ilike('id_sales_order', `%${search.trim()}%`)
+          } else if (type === 'cnpj') {
+            q = q.eq('company_cnpj', search.replace(/\D/g, ''))
+          } else {
+            // Busca por nome da empresa — ilike para busca parcial
+            q = q.ilike('company_name', `%${search.trim()}%`)
+          }
+        }
+
         if (seller) q = q.eq('merchant_name', seller)
         if (period) {
           const days = parseInt(period)
@@ -80,16 +99,23 @@ export function useOrders({
         const offset = (page - 1) * pageSize
         const { data: idRows, count, error: idErr } = await q
           .order('order_created_at', { ascending: false })
-          .range(offset, offset + pageSize - 1)
+          .range(offset, offset + pageSize * 5 - 1) // busca mais para deduplcar
 
         if (idErr) throw new Error(idErr.message)
         if (cancelled) return
 
-        const ids: string[] = [...new Set(
-          ((idRows ?? []) as { id_sales_order: string }[]).map(r => r.id_sales_order)
-        )]
-        setTotal(count ?? 0)
+        // Deduplica IDs mantendo ordem
+        const seen = new Set<string>()
+        const ids: string[] = []
+        for (const r of (idRows ?? []) as { id_sales_order: string }[]) {
+          if (!seen.has(r.id_sales_order)) {
+            seen.add(r.id_sales_order)
+            ids.push(r.id_sales_order)
+            if (ids.length >= pageSize) break
+          }
+        }
 
+        setTotal(count ?? 0)
         if (ids.length === 0) { setOrders([]); setLoading(false); return }
 
         const { data: rows, error: rowErr } = await db
@@ -100,7 +126,13 @@ export function useOrders({
         if (rowErr) throw new Error(rowErr.message)
         if (cancelled) return
 
-        setOrders(groupRows((rows ?? []) as OrderRow[]))
+        // Mantém a ordem dos IDs
+        const grouped = groupRows((rows ?? []) as OrderRow[])
+        const ordered = ids
+          .map(id => grouped.find(o => o.id_sales_order === id))
+          .filter(Boolean) as OrderPreview[]
+
+        setOrders(ordered)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Erro ao carregar pedidos')
       } finally {
@@ -115,12 +147,28 @@ export function useOrders({
 }
 
 export async function getOrderPreview(orderId: string): Promise<OrderPreview | null> {
-  const { data, error } = await db
-    .from('orders')
-    .select('*')
-    .eq('id_sales_order', orderId)
-
+  const { data, error } = await db.from('orders').select('*').eq('id_sales_order', orderId)
   if (error || !data || (data as unknown[]).length === 0) return null
-  const previews = groupRows(data as OrderRow[])
-  return previews[0] ?? null
+  return groupRows(data as OrderRow[])[0] ?? null
+}
+
+export async function searchOrders(query: string): Promise<OrderPreview[]> {
+  if (!query.trim()) return []
+  const type = detectSearchType(query.trim())
+  let q = db.from('orders').select('*')
+
+  if (type === 'order_id') {
+    q = q.ilike('id_sales_order', `%${query.trim()}%`)
+  } else if (type === 'cnpj') {
+    q = q.eq('company_cnpj', query.replace(/\D/g, ''))
+  } else {
+    q = q.ilike('company_name', `%${query.trim()}%`)
+  }
+
+  const { data } = await q
+    .order('order_created_at', { ascending: false })
+    .limit(200)
+
+  if (!data || (data as unknown[]).length === 0) return []
+  return groupRows(data as OrderRow[])
 }
