@@ -1,14 +1,17 @@
 import { useState, useRef } from 'react'
-import { Upload, CheckCircle, AlertCircle, RefreshCw, FileSpreadsheet } from 'lucide-react'
-import { parseOrderXlsx, upsertOrders } from '@/lib/orderSync'
+import { Upload, CheckCircle, AlertCircle, RefreshCw, FileSpreadsheet, Store } from 'lucide-react'
+import { parseOrderXlsx, upsertOrders, syncSellersFromOrders } from '@/lib/orderSync'
 import type { UpsertResult } from '@/lib/orderSync'
 
-type UploadState = 'idle' | 'parsing' | 'uploading' | 'done' | 'error'
+type UploadState = 'idle' | 'parsing' | 'uploading' | 'syncing_sellers' | 'done' | 'error'
 
 export default function ConfigPage() {
   const [state, setState] = useState<UploadState>('idle')
   const [result, setResult] = useState<UpsertResult | null>(null)
-  const [parseInfo, setParseInfo] = useState<{ totalRows: number; skippedRows: number; duplicatesRemoved: number } | null>(null)
+  const [sellersCreated, setSellersCreated] = useState(0)
+  const [parseInfo, setParseInfo] = useState<{
+    totalRows: number; skippedRows: number; duplicatesRemoved: number
+  } | null>(null)
   const [progress, setProgress] = useState(0)
   const [fileName, setFileName] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
@@ -23,6 +26,7 @@ export default function ConfigPage() {
     setFileName(file.name)
     setErrorMsg('')
     setResult(null)
+    setSellersCreated(0)
     setState('parsing')
     setProgress(10)
 
@@ -31,7 +35,11 @@ export default function ConfigPage() {
       setProgress(30)
 
       const parsed = parseOrderXlsx(buffer)
-      setParseInfo({ totalRows: parsed.totalRows, skippedRows: parsed.skippedRows, duplicatesRemoved: parsed.duplicatesRemoved })
+      setParseInfo({
+        totalRows: parsed.totalRows,
+        skippedRows: parsed.skippedRows,
+        duplicatesRemoved: parsed.duplicatesRemoved,
+      })
       setProgress(50)
 
       if (parsed.rows.length === 0) {
@@ -40,11 +48,18 @@ export default function ConfigPage() {
         return
       }
 
+      // 1. Upsert pedidos
       setState('uploading')
       setProgress(60)
-
       const res = await upsertOrders(parsed.rows)
+      setProgress(85)
+
+      // 2. Sync sellers automaticamente
+      setState('syncing_sellers')
+      const novos = await syncSellersFromOrders(parsed.rows)
+      setSellersCreated(novos)
       setProgress(100)
+
       setResult(res)
       setState(res.success ? 'done' : 'error')
       if (!res.success) setErrorMsg(res.errors.join('\n'))
@@ -68,11 +83,20 @@ export default function ConfigPage() {
 
   function reset() {
     setState('idle'); setResult(null); setParseInfo(null)
-    setProgress(0); setFileName(''); setErrorMsg('')
+    setProgress(0); setFileName(''); setErrorMsg(''); setSellersCreated(0)
     if (inputRef.current) inputRef.current.value = ''
   }
 
-  const isProcessing = state === 'parsing' || state === 'uploading'
+  const isProcessing = ['parsing', 'uploading', 'syncing_sellers'].includes(state)
+
+  const stateLabel: Record<UploadState, string> = {
+    idle: '',
+    parsing: `Lendo ${fileName}...`,
+    uploading: `Sincronizando pedidos...`,
+    syncing_sellers: 'Sincronizando sellers...',
+    done: '',
+    error: '',
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -89,7 +113,7 @@ export default function ConfigPage() {
         </div>
         <p className="text-sm text-gray-500">
           Baixe o <code className="bg-gray-100 px-1 rounded text-xs">order.xlsx</code> do SharePoint e importe aqui.
-          Recomendado 1x ao dia, pela manhã.
+          Pedidos e sellers são sincronizados automaticamente.
         </p>
 
         {state === 'idle' && (
@@ -110,9 +134,7 @@ export default function ConfigPage() {
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <RefreshCw size={15} className="animate-spin text-zf-blue" />
-              {state === 'parsing'
-                ? `Lendo ${fileName}...`
-                : `Sincronizando ${parseInfo?.totalRows.toLocaleString('pt-BR')} linhas...`}
+              {stateLabel[state]}
             </div>
             <div className="w-full bg-gray-100 rounded-full h-2">
               <div className="bg-zf-blue h-2 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
@@ -125,14 +147,23 @@ export default function ConfigPage() {
           <div className="space-y-3">
             <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-lg p-4">
               <CheckCircle size={18} className="text-green-600 mt-0.5 shrink-0" />
-              <div>
+              <div className="space-y-1">
                 <p className="text-sm font-medium text-green-800">Importação concluída com sucesso</p>
-                <p className="text-xs text-green-700 mt-1">
-                  {result.rowsUpserted.toLocaleString('pt-BR')} linhas sincronizadas
+                <p className="text-xs text-green-700">
+                  {result.rowsUpserted.toLocaleString('pt-BR')} linhas de pedidos sincronizadas
                   {parseInfo?.skippedRows ? ` · ${parseInfo.skippedRows} ignoradas` : ''}
                   {parseInfo?.duplicatesRemoved ? ` · ${parseInfo.duplicatesRemoved} duplicatas removidas` : ''}
                   {' · '}{(result.duration / 1000).toFixed(1)}s
                 </p>
+                {sellersCreated > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs text-green-700 mt-1">
+                    <Store size={13} />
+                    <span>
+                      <strong>{sellersCreated} seller{sellersCreated > 1 ? 's' : ''} novo{sellersCreated > 1 ? 's' : ''}</strong> adicionado{sellersCreated > 1 ? 's' : ''} ao Playbook —{' '}
+                      <a href="/playbook" className="underline font-medium">complete as instruções</a>
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             <button onClick={reset} className="btn-secondary text-sm">Importar outro arquivo</button>
@@ -158,7 +189,7 @@ export default function ConfigPage() {
             <li>Acesse o SharePoint do [pro]Parts</li>
             <li>Navegue até <code className="bg-gray-200 px-1 rounded">[pro]Parts / Shared Documents</code></li>
             <li>Baixe o arquivo <code className="bg-gray-200 px-1 rounded">order.xlsx</code></li>
-            <li>Importe aqui</li>
+            <li>Importe aqui — sellers novos são criados automaticamente no Playbook</li>
           </ol>
         </div>
       </div>
