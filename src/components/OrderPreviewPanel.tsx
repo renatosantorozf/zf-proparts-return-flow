@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Copy, Check, Car, Package, FileText } from 'lucide-react'
+import { Copy, Check, Car, Package, FileText, Key } from 'lucide-react'
 import { MeiBadge } from './MeiBadge'
 import { useMei } from '@/hooks/useMei'
 import { formatarMoeda, formatarCNPJ, formatarChaveXML } from '@/lib/formatters'
@@ -7,6 +7,7 @@ import type { OrderPreview, OrderRow, TicketItem } from '@/types'
 
 interface SelectedItem extends Omit<TicketItem, 'id' | 'ticket_id'> {
   selected: boolean
+  _sellerIdx: number
 }
 
 interface OrderPreviewPanelProps {
@@ -23,7 +24,7 @@ function CopyButton({ text }: { text: string }) {
     setTimeout(() => setCopied(false), 2000)
   }
   return (
-    <button onClick={copy} className="ml-1 text-gray-400 hover:text-gray-600 transition-colors">
+    <button onClick={copy} className="ml-1 text-gray-400 hover:text-gray-600 transition-colors" title="Copiar">
       {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
     </button>
   )
@@ -39,11 +40,11 @@ const SELLER_COLORS = [
 export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPanelProps) {
   const { status: meiStatus } = useMei(order.company_cnpj)
 
-  // Inicializa itens com todos selecionados
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>(() =>
     order.sellers.flatMap((s, si) =>
       s.items.map((item: OrderRow) => ({
         selected: true,
+        _sellerIdx: si,
         item_sku: item.item_sku,
         item_brand: item.item_brand ?? undefined,
         item_part_number: item.item_part_number ?? undefined,
@@ -54,22 +55,19 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
         valor_devolvido: (item.item_net_price ?? 0) * (item.item_quantity ?? 1),
         merchant_reference: item.merchant_reference ?? undefined,
         merchant_name: item.merchant_name ?? s.merchant_name,
-        _sellerIdx: si,
       }))
     )
   )
 
-  function toggleItem(sku: string, sellerIdx: number) {
+  function toggleItem(sku: string, si: number) {
     setSelectedItems(prev => prev.map(i =>
-      i.item_sku === sku && (i as any)._sellerIdx === sellerIdx
-        ? { ...i, selected: !i.selected }
-        : i
+      i.item_sku === sku && i._sellerIdx === si ? { ...i, selected: !i.selected } : i
     ))
   }
 
-  function updateQty(sku: string, sellerIdx: number, qty: number) {
+  function updateQty(sku: string, si: number, qty: number) {
     setSelectedItems(prev => prev.map(i => {
-      if (i.item_sku === sku && (i as any)._sellerIdx === sellerIdx) {
+      if (i.item_sku === sku && i._sellerIdx === si) {
         const q = Math.max(1, Math.min(qty, i.qtd_original))
         return { ...i, qtd_devolvida: q, valor_devolvido: (i.item_net_price ?? 0) * q }
       }
@@ -84,10 +82,7 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
 
   function handleConfirm() {
     if (selected.length === 0) return
-    const items = selected.map(({ selected: _s, ...rest }) => {
-      const { _sellerIdx, ...item } = rest as any
-      return item
-    })
+    const items = selected.map(({ selected: _s, _sellerIdx: _idx, ...rest }) => rest)
     onConfirm(items, isTotal ? 'total' : 'parcial', valorTotal)
   }
 
@@ -128,28 +123,34 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
           </div>
         </div>
 
+        {/* Veículo — já formatado pelo groupRows */}
         {order.order_vehicle && (
           <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-            <Car size={15} className="text-gray-400" />
+            <Car size={15} className="text-gray-400 shrink-0" />
             <span className="text-sm font-medium text-gray-700">{order.order_vehicle}</span>
           </div>
         )}
 
-        {order.numero_nf && (
-          <div className="flex items-center gap-2 text-sm">
-            <FileText size={14} className="text-gray-400" />
-            <span className="text-gray-600">NF:</span>
-            <span className="font-mono font-medium">{order.numero_nf}</span>
-            <CopyButton text={order.numero_nf} />
+        {/* NF — número separado da chave XML */}
+        {(order.numero_nf || order.chave_xml_nf) && (
+          <div className="space-y-1.5">
+            {order.numero_nf && (
+              <div className="flex items-center gap-2 text-sm">
+                <FileText size={14} className="text-gray-400 shrink-0" />
+                <span className="text-gray-500">NF nº</span>
+                <span className="font-mono font-semibold text-gray-800">{order.numero_nf}</span>
+                <CopyButton text={order.numero_nf} />
+              </div>
+            )}
             {order.chave_xml_nf && (
-              <>
-                <span className="text-gray-300">|</span>
-                <span className="text-gray-600">Chave:</span>
-                <span className="font-mono text-xs text-gray-700 truncate max-w-[140px]">
+              <div className="flex items-start gap-2 text-sm">
+                <Key size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                <span className="text-gray-500 shrink-0">Chave NF-e</span>
+                <span className="font-mono text-xs text-gray-600 break-all leading-relaxed">
                   {formatarChaveXML(order.chave_xml_nf)}
                 </span>
                 <CopyButton text={order.chave_xml_nf} />
-              </>
+              </div>
             )}
           </div>
         )}
@@ -164,21 +165,24 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
 
         {order.sellers.map((seller, si) => (
           <div key={seller.merchant_reference} className="card overflow-hidden">
-            <div className={`px-4 py-2 flex items-center gap-2 border-b border-gray-100`}>
-              <span className={`badge ${SELLER_COLORS[si % SELLER_COLORS.length]}`}>
+            <div className="px-4 py-2.5 flex items-center gap-2 border-b border-gray-100 bg-gray-50">
+              <span className={`badge ${SELLER_COLORS[si % SELLER_COLORS.length]} font-medium`}>
                 {seller.merchant_name}
               </span>
-              <span className="text-xs text-gray-400">Loja #{seller.merchant_reference}</span>
+              {seller.merchant_reference && (
+                <span className="text-xs text-gray-400">#{seller.merchant_reference}</span>
+              )}
             </div>
 
             <div className="divide-y divide-gray-50">
               {seller.items.map((item: OrderRow) => {
-                const sel = selectedItems.find(
-                  s => s.item_sku === item.item_sku && (s as any)._sellerIdx === si
-                )
+                const sel = selectedItems.find(s => s.item_sku === item.item_sku && s._sellerIdx === si)
                 if (!sel) return null
                 return (
-                  <div key={item.item_sku} className={`px-4 py-3 flex items-start gap-3 transition-colors ${sel.selected ? 'bg-white' : 'bg-gray-50 opacity-60'}`}>
+                  <div
+                    key={item.item_sku}
+                    className={`px-4 py-3 flex items-start gap-3 transition-colors ${sel.selected ? 'bg-white' : 'bg-gray-50 opacity-60'}`}
+                  >
                     <input
                       type="checkbox"
                       checked={sel.selected}
@@ -186,8 +190,8 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
                       className="mt-1 rounded border-gray-300 text-zf-blue focus:ring-zf-blue cursor-pointer"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{item.item_name}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-sm font-medium text-gray-800 leading-snug">{item.item_name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
                         SKU: {item.item_sku}
                         {item.item_brand && ` · ${item.item_brand}`}
                         {item.item_part_number && ` · ${item.item_part_number}`}
@@ -203,13 +207,13 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
                             max={item.item_quantity ?? 1}
                             value={sel.qtd_devolvida}
                             onChange={e => updateQty(item.item_sku, si, parseInt(e.target.value) || 1)}
-                            className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm"
+                            className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:outline-none focus:border-zf-blue"
                           />
-                          <span className="text-xs text-gray-400">/ {item.item_quantity}</span>
+                          <span className="text-xs text-gray-400">/{item.item_quantity}</span>
                         </div>
                       )}
                       <span className="text-sm font-medium text-gray-700 w-20 text-right">
-                        {formatarMoeda(sel.selected ? sel.valor_devolvido : undefined)}
+                        {sel.selected ? formatarMoeda(sel.valor_devolvido) : ''}
                       </span>
                     </div>
                   </div>
@@ -220,13 +224,12 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
         ))}
       </div>
 
-      {/* Resumo e confirmação */}
-      <div className="card p-4 space-y-3 sticky bottom-0 bg-white shadow-lg border-t-2 border-zf-blue">
+      {/* Resumo sticky */}
+      <div className="card p-4 sticky bottom-0 bg-white border-t-2 border-zf-blue shadow-lg">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600">
-              {selected.length} {selected.length === 1 ? 'item' : 'itens'} selecionado{selected.length !== 1 ? 's' : ''}
-              {' · '}
+              {selected.length} {selected.length === 1 ? 'item' : 'itens'} ·{' '}
               <span className={`font-medium ${isTotal ? 'text-gray-700' : 'text-amber-700'}`}>
                 {isTotal ? 'Devolução total' : 'Devolução parcial'}
               </span>
@@ -235,11 +238,7 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
           </div>
           <div className="flex gap-2">
             <button onClick={onCancel} className="btn-secondary text-sm">Cancelar</button>
-            <button
-              onClick={handleConfirm}
-              disabled={selected.length === 0}
-              className="btn-primary text-sm"
-            >
+            <button onClick={handleConfirm} disabled={selected.length === 0} className="btn-primary text-sm">
               Criar Ticket →
             </button>
           </div>
