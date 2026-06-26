@@ -138,3 +138,43 @@ export async function upsertOrders(rows: Record<string, unknown>[]): Promise<Ups
 
   return { success: errors.length === 0, rowsUpserted, errors, duration: Date.now() - start }
 }
+
+export async function syncSellersFromOrders(rows: Record<string, unknown>[]): Promise<number> {
+  // Extrai sellers únicos da planilha
+  const sellersMap = new Map<string, { merchant_reference: string; merchant_name: string }>()
+  for (const row of rows) {
+    const ref = row.merchant_reference as string
+    const name = row.merchant_name as string
+    if (ref && name && !sellersMap.has(ref)) {
+      sellersMap.set(ref, { merchant_reference: ref, merchant_name: name })
+    }
+  }
+
+  if (sellersMap.size === 0) return 0
+
+  // Busca sellers já cadastrados
+  const refs = Array.from(sellersMap.keys())
+  const { data: existing } = await db
+    .from('sellers')
+    .select('merchant_reference')
+    .in('merchant_reference', refs)
+
+  const existingRefs = new Set(
+    ((existing ?? []) as { merchant_reference: string }[]).map(s => s.merchant_reference)
+  )
+
+  // Insere apenas os novos (sem sobrescrever os que já têm playbook)
+  const novos = Array.from(sellersMap.values()).filter(s => !existingRefs.has(s.merchant_reference))
+
+  if (novos.length === 0) return 0
+
+  await db.from('sellers').insert(
+    novos.map(s => ({
+      merchant_reference: s.merchant_reference,
+      merchant_name: s.merchant_name,
+      canal_preferencial: 'ambos',
+    }))
+  )
+
+  return novos.length
+}
