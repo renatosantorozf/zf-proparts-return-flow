@@ -33,7 +33,7 @@ export function formatarVeiculo(raw: string | null | undefined): string {
     if (v.variant && String(v.variant).length <= 40) parts.push(String(v.variant))
     const plate = obj.license_plate ?? v.license_plate
     const label = parts.join(' ')
-    return plate ? `${label} · ${plate}` : label
+    return plate ? `${label} - ${plate}` : label
   } catch {
     return s.length > 60 ? s.slice(0, 57) + '...' : s
   }
@@ -60,27 +60,27 @@ export function gerarMensagem(template: string, vars: Record<string, string>): s
 }
 
 export function templatePadrao(): string {
-  return `Olá, {{contato_seller}}!
+  return `Ola, {{contato_seller}}!
 
-Solicito autorização de devolução referente ao pedido abaixo:
+Solicito autorizacao de devolucao referente ao pedido abaixo:
 
 Pedido: #{{order_id}}
 Empresa: {{cliente_nome}}
 CNPJ: {{cnpj_cliente}}
-Veículo: {{order_vehicle}}
-Data da Solicitação: {{data_solicitacao}}
-Seller: {{seller_nome}} | Loja nº {{seller_loja_id}}
+Veiculo: {{order_vehicle}}
+Data da Solicitacao: {{data_solicitacao}}
+Seller: {{seller_nome}} | Loja n {{seller_loja_id}}
 
 Itens a devolver:
 {{itens_devolvidos}}
 
-Nota Fiscal nº: {{numero_nf}}
+Nota Fiscal n: {{numero_nf}}
 Chave de Acesso NF-e: {{chave_xml_nf}}
-Valor total da devolução: {{valor_total_devolucao}}
+Valor total da devolucao: {{valor_total_devolucao}}
 Motivo: {{motivo}}
 Cliente MEI: {{is_mei}}
 
-Aguardo o retorno com as instruções para prosseguir.
+Aguardo o retorno com as instrucoes para prosseguir.
 
 Atenciosamente,
 ZF [pro]Parts`
