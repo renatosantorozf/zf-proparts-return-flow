@@ -8,7 +8,7 @@ import { formatarMoeda, formatarCNPJ, formatarChaveXML, gerarMensagem, templateP
 import { formatarDataHora } from '@/lib/dateUtils'
 import type { TicketStatus, LogTipo, Seller } from '@/types'
 import { STATUS_LABELS, KANBAN_COLUMNS } from '@/types'
-import { abrirEmailEml } from '@/lib/emailUtils'
+import { abrirEmailOutlook } from '@/lib/emailUtils'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function TicketPage() {
@@ -94,7 +94,7 @@ export default function TicketPage() {
     const subject = `Solicitação de Devolução - Pedido ZF [pro]Parts #${ticket?.order_id}`
 
     // Usa .eml para garantir encoding UTF-8 correto no Outlook
-    abrirEmailEml({ to: email, subject, body: msg })
+    abrirEmailOutlook({ to: email, subject, body: msg })
 
     if (id) addLog(id, 'email', `Comunicação gerada via E-mail${email ? ` para ${email}` : ''}`, user?.id).then(refetch)
     setShowMsgModal(false)
