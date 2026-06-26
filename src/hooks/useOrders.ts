@@ -50,22 +50,9 @@ function groupRows(rows: OrderRow[]): OrderPreview[] {
       sg = { merchant_reference: sellerRef, merchant_name: row.merchant_name ?? '', items: [] }
       preview.sellers.push(sg)
     }
-
-    // Consolida linhas do mesmo SKU no mesmo seller
-    // Soma quantidades e agrupa estados
-    const existingItem = sg.items.find((i: OrderRow) => i.item_sku === row.item_sku)
-    if (existingItem) {
-      // Soma a quantidade
-      existingItem.item_quantity = (existingItem.item_quantity ?? 0) + (row.item_quantity ?? 0)
-      // Agrega estados únicos
-      const existingStates = String(existingItem.item_state ?? '').split(',').map(s => s.trim())
-      const newState = String(row.item_state ?? '').trim()
-      if (newState && !existingStates.includes(newState)) {
-        existingItem.item_state = [...existingStates, newState].filter(Boolean).join(', ')
-      }
-    } else {
-      sg.items.push({ ...row })
-    }
+    // Cada linha da planilha = um item separado (sem consolidar)
+    // O analista seleciona quais linhas/quantidades devolver
+    sg.items.push({ ...row })
   }
 
   return Array.from(orderMap.values())
@@ -99,13 +86,9 @@ export function useOrders({
 
         if (search.trim()) {
           const type = detectSearchType(search.trim())
-          if (type === 'order_id') {
-            q = q.ilike('id_sales_order', `%${search.trim()}%`)
-          } else if (type === 'cnpj') {
-            q = q.eq('company_cnpj', search.replace(/\D/g, ''))
-          } else {
-            q = q.ilike('company_name', `%${search.trim()}%`)
-          }
+          if (type === 'order_id') q = q.ilike('id_sales_order', '%' + search.trim() + '%')
+          else if (type === 'cnpj') q = q.eq('company_cnpj', search.replace(/\D/g, ''))
+          else q = q.ilike('company_name', '%' + search.trim() + '%')
         }
 
         if (seller) q = q.eq('merchant_name', seller)
@@ -138,6 +121,7 @@ export function useOrders({
 
         const { data: rows, error: rowErr } = await db
           .from('orders').select('*').in('id_sales_order', ids)
+          .order('item_sku', { ascending: true })
 
         if (rowErr) throw new Error(rowErr.message)
         if (cancelled) return
@@ -161,7 +145,9 @@ export function useOrders({
 }
 
 export async function getOrderPreview(orderId: string): Promise<OrderPreview | null> {
-  const { data, error } = await db.from('orders').select('*').eq('id_sales_order', orderId)
+  const { data, error } = await db.from('orders').select('*')
+    .eq('id_sales_order', orderId)
+    .order('item_sku', { ascending: true })
   if (error || !data || (data as unknown[]).length === 0) return null
   return groupRows(data as OrderRow[])[0] ?? null
 }
@@ -171,13 +157,9 @@ export async function searchOrders(query: string): Promise<OrderPreview[]> {
   const type = detectSearchType(query.trim())
   let q = db.from('orders').select('*')
 
-  if (type === 'order_id') {
-    q = q.ilike('id_sales_order', `%${query.trim()}%`)
-  } else if (type === 'cnpj') {
-    q = q.eq('company_cnpj', query.replace(/\D/g, ''))
-  } else {
-    q = q.ilike('company_name', `%${query.trim()}%`)
-  }
+  if (type === 'order_id') q = q.ilike('id_sales_order', '%' + query.trim() + '%')
+  else if (type === 'cnpj') q = q.eq('company_cnpj', query.replace(/\D/g, ''))
+  else q = q.ilike('company_name', '%' + query.trim() + '%')
 
   const { data } = await q.order('order_created_at', { ascending: false }).limit(200)
   if (!data || (data as unknown[]).length === 0) return []
