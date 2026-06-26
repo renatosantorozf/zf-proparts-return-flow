@@ -6,38 +6,49 @@ Módulo interno de gestão de devoluções e garantias para o marketplace ZF [pr
 
 - **Frontend:** React + Vite + TypeScript + Tailwind CSS
 - **Backend / BaaS:** Supabase (Auth + PostgreSQL + Storage)
-- **Hospedagem:** Cloudflare Pages
-- **Sync SharePoint:** Cloudflare Worker (cron 1h)
+- **Hospedagem:** Cloudflare Workers (Static Assets)
+- **Sync SharePoint:** Cloudflare Worker separado — `workers/sync-orders` (PAD-03)
+
+## Deploy
+
+O projeto usa **Cloudflare Workers com Static Assets** (modelo atual da Cloudflare, que unificou Pages + Workers).
+
+O build do Vite gera os arquivos em `dist/` e o Worker os serve como site estático com suporte a SPA (React Router).
+
+### Via Cloudflare Dashboard (Workers Builds)
+
+1. Workers & Pages → Create application → Worker
+2. Connect to Git → selecionar `zf-proparts-return-flow`
+3. Build command: `npm run build`
+4. Build output: `dist`
+5. Adicionar variáveis de ambiente:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+
+## Desenvolvimento local
+
+```bash
+npm install
+cp .env.example .env.local
+# Editar .env.local com credenciais Supabase
+npm run dev
+```
 
 ## Estrutura
 
 ```
 src/
-  components/    # Componentes reutilizáveis
-  hooks/         # Custom hooks (useAuth, useSla, useSyncStatus)
-  lib/           # Utilitários (supabase, dateUtils, formatters)
-  pages/         # Páginas da aplicação
-  types/         # TypeScript types
+  components/    # Layout, componentes reutilizáveis
+  hooks/         # useAuth, useSla, useSyncStatus
+  lib/           # supabase, dateUtils, formatters
+  pages/         # Kanban, Pedidos, Ticket, Playbook, Config, Login
+  types/         # TypeScript types + schema Supabase
 
 workers/
-  sync-orders/   # Cloudflare Worker: sync do order.xlsx (PAD-03)
+  sync-orders/   # Worker de sync do order.xlsx (PAD-03)
 
 supabase/
   migrations/    # Histórico do schema
-```
-
-## Desenvolvimento local
-
-```bash
-# 1. Instalar dependências
-npm install
-
-# 2. Configurar variáveis de ambiente
-cp .env.example .env.local
-# Editar .env.local com suas credenciais Supabase
-
-# 3. Iniciar servidor de desenvolvimento
-npm run dev
 ```
 
 ## Pontos a Definir (PAD)
@@ -49,10 +60,6 @@ npm run dev
 | PAD-03 | App Registration Azure AD ZF (Graph API) | Aberto |
 | PAD-04 | Aprovação compliance Supabase/Cloudflare | Aberto |
 | PAD-05 | Volume de devoluções/semana (baseline) | Aberto |
-
-## PRD
-
-Ver: `PRD_ReturnFlow_proParts_v6.md` (ATOM Product Lab)
 
 ---
 
