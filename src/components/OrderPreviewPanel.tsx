@@ -1,14 +1,23 @@
-import { useState } from 'react'
-import { Copy, Check, Car, Package, FileText, Key } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Copy, Check, Car, Package, FileText, Key, AlertCircle } from 'lucide-react'
 import { MeiBadge } from './MeiBadge'
 import { useMei } from '@/hooks/useMei'
 import { formatarCNPJ, formatarChaveXML } from '@/lib/formatters'
+import { db } from '@/lib/db'
 import type { OrderPreview, OrderRow, TicketItem } from '@/types'
 
 interface SelectedItem extends Omit<TicketItem, 'id' | 'ticket_id'> {
   selected: boolean
   _sellerIdx: number
   _rowIdx: number
+}
+
+interface ExistingTicket {
+  ticket_number: number
+  id: string
+  item_skus: string[]
+  tipo: string
+  status: string
 }
 
 interface OrderPreviewPanelProps {
@@ -40,8 +49,41 @@ const SELLER_COLORS = [
 
 export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPanelProps) {
   const { status: meiStatus } = useMei(order.company_cnpj)
+  const [existingTickets, setExistingTickets] = useState<ExistingTicket[]>([])
 
-  // Cada linha da planilha = 1 item, qtd sempre 1, desmarcado por padrao
+  // Busca tickets existentes para este pedido
+  useEffect(() => {
+    async function loadTickets() {
+      const { data: tickets } = await db
+        .from('tickets')
+        .select('id, ticket_number, tipo, status')
+        .eq('order_id', order.id_sales_order)
+        .not('status', 'in', '(encerrado,recusado)')
+
+      if (!tickets || tickets.length === 0) return
+
+      // Para cada ticket, busca os SKUs dos itens
+      const result: ExistingTicket[] = []
+      for (const t of tickets as { id: string; ticket_number: number; tipo: string; status: string }[]) {
+        const { data: items } = await db
+          .from('ticket_items')
+          .select('item_sku')
+          .eq('ticket_id', t.id)
+        result.push({
+          ...t,
+          item_skus: ((items ?? []) as { item_sku: string }[]).map(i => i.item_sku),
+        })
+      }
+      setExistingTickets(result)
+    }
+    loadTickets()
+  }, [order.id_sales_order])
+
+  // Verifica se um SKU já tem ticket aberto
+  function getExistingTicketForSku(sku: string): ExistingTicket | undefined {
+    return existingTickets.find(t => t.item_skus.includes(sku))
+  }
+
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>(() =>
     order.sellers.flatMap((s, si) =>
       s.items.map((item: OrderRow, ri: number) => ({
@@ -143,6 +185,22 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
             )}
           </div>
         )}
+
+        {/* Alerta de tickets existentes */}
+        {existingTickets.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-800">
+              <p className="font-medium">Este pedido ja possui ticket{existingTickets.length > 1 ? 's' : ''} aberto{existingTickets.length > 1 ? 's' : ''}:</p>
+              {existingTickets.map(t => (
+                <a key={t.id} href={'/tickets/' + t.id}
+                  className="underline block mt-0.5">
+                  Ticket #{t.ticket_number} ({t.tipo} - {t.status.replace(/_/g, ' ')})
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Itens por seller */}
@@ -171,6 +229,7 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
               {seller.items.map((item: OrderRow, ri: number) => {
                 const sel = selectedItems.find(s => s._sellerIdx === si && s._rowIdx === ri)
                 if (!sel) return null
+                const existingTicket = getExistingTicketForSku(item.item_sku)
                 return (
                   <label
                     key={si + '-' + ri}
@@ -184,10 +243,20 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
                       className="mt-0.5 rounded border-gray-300 text-zf-blue focus:ring-zf-blue cursor-pointer"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className={'text-sm font-medium leading-snug ' +
-                        (sel.selected ? 'text-gray-900' : 'text-gray-500')}>
-                        {item.item_name}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={'text-sm font-medium leading-snug ' +
+                          (sel.selected ? 'text-gray-900' : 'text-gray-500')}>
+                          {item.item_name}
+                        </p>
+                        {existingTicket && (
+                          <a href={'/tickets/' + existingTicket.id}
+                            onClick={e => e.stopPropagation()}
+                            className="badge bg-amber-100 text-amber-700 text-xs flex items-center gap-1 hover:bg-amber-200">
+                            <AlertCircle size={10} />
+                            Ticket #{existingTicket.ticket_number}
+                          </a>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-400 mt-0.5">
                         {item.item_sku}
                         {item.item_brand ? ' · ' + item.item_brand : ''}
@@ -212,7 +281,7 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
                   {selected.length} {selected.length === 1 ? 'item' : 'itens'} selecionado{selected.length > 1 ? 's' : ''}
                   {' · '}
                   <span className={isTotal ? 'text-gray-600' : 'text-amber-700'}>
-                    {isTotal ? 'Devolucao total' : 'Devolucao parcial'}
+                    {isTotal ? 'Total' : 'Parcial'}
                   </span>
                 </p>
             }
