@@ -47,7 +47,7 @@ export function parseOrderXlsx(buffer: ArrayBuffer): ParseResult {
     const itemSku = row[COL.item_sku]
     if (!orderId || !itemSku) { skippedRows++; continue }
 
-    const key = `${orderId}__${itemSku}`
+    const key = `${orderId}__${itemSku}__${s(row[COL.item_state])}__${n(row[COL.item_discount_value])}`
     try {
       const record: Record<string, unknown> = {
         id_sales_order: s(orderId),
@@ -121,7 +121,7 @@ export async function upsertOrders(rows: Record<string, unknown>[]): Promise<Ups
     const batch = rows.slice(i, i + BATCH_SIZE)
     const { error } = await db
       .from('orders')
-      .upsert(batch, { onConflict: 'id_sales_order,item_sku', ignoreDuplicates: true })
+      .upsert(batch, { onConflict: 'id_sales_order,item_sku,item_state,item_discount_value', ignoreDuplicates: true })
 
     if (error) {
       errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${error.message}`)
