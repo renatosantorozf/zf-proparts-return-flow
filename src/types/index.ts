@@ -4,6 +4,7 @@ export type TicketStatus =
   | 'aguardando_autorizacao'
   | 'autorizado'
   | 'nfd_pendente'
+  | 'logistica_reversa_concluida'
   | 'encerrado'
   | 'recusado'
   | 'peca_enviada_fabrica'
@@ -147,6 +148,7 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   aguardando_autorizacao: 'Aguardando Autorização',
   autorizado: 'Autorizado',
   nfd_pendente: 'NFD Pendente',
+  logistica_reversa_concluida: 'Logistica Reversa Concluida',
   encerrado: 'Estorno Realizado',
   recusado: 'Recusado',
   peca_enviada_fabrica: 'Peça Enviada à Fábrica',
@@ -160,6 +162,7 @@ export const KANBAN_COLUMNS: TicketStatus[] = [
   'aguardando_autorizacao',
   'autorizado',
   'nfd_pendente',
+  'logistica_reversa_concluida',
   'encerrado',
   'recusado',
 ]
