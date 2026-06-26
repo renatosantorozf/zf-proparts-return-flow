@@ -9,4 +9,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
+  // SPA: garante que rotas do React Router funcionam em dev
+  server: {
+    port: 5173,
+  },
 })
