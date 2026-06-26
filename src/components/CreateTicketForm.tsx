@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { createTicket } from '@/hooks/useTickets'
 import { useMei } from '@/hooks/useMei'
+import { getSellerByRef } from '@/hooks/useSellers'
 import type { OrderPreview, TicketItem, TicketTipo, TicketSubtipo, CanalEntrada } from '@/types'
 
 interface CreateTicketFormProps {
@@ -11,6 +12,13 @@ interface CreateTicketFormProps {
   devolucaoTipo: 'total' | 'parcial'
   valorTotal: number
   onBack: () => void
+}
+
+// Mapeia canal do playbook para canal de entrada do ticket
+function canalPlaybookParaEntrada(canal: string | null | undefined): CanalEntrada {
+  if (canal === 'whatsapp' || canal === 'ambos') return 'whatsapp_individual'
+  if (canal === 'email') return 'email'
+  return 'whatsapp_individual'
 }
 
 export function CreateTicketForm({
@@ -27,8 +35,23 @@ export function CreateTicketForm({
   const [chaveXml, setChaveXml] = useState(order.chave_xml_nf ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [sellerNome, setSellerNome] = useState<string>('')
+  const [canalPreenchido, setCanalPreenchido] = useState(false)
 
   const sellerPrincipal = order.sellers[0]
+
+  // Pré-seleciona canal do playbook do seller
+  useEffect(() => {
+    if (!sellerPrincipal?.merchant_reference) return
+    getSellerByRef(sellerPrincipal.merchant_reference).then(s => {
+      if (s) {
+        setSellerNome(s.merchant_name)
+        const canalSugerido = canalPlaybookParaEntrada(s.canal_preferencial)
+        setCanal(canalSugerido)
+        setCanalPreenchido(true)
+      }
+    })
+  }, [sellerPrincipal?.merchant_reference])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -80,8 +103,16 @@ export function CreateTicketForm({
     navigate(`/tickets/${result.id}`)
   }
 
+  const CANAIS: { value: CanalEntrada; label: string }[] = [
+    { value: 'whatsapp_individual', label: 'WhatsApp Individual' },
+    { value: 'whatsapp_grupo',      label: 'WhatsApp Grupo' },
+    { value: 'email',               label: 'E-mail' },
+    { value: 'outro',               label: 'Outro' },
+  ]
+
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Resumo */}
       <div className="card p-4 bg-gray-50 space-y-1">
         <p className="text-xs text-gray-500">Criando ticket para</p>
         <p className="font-bold text-gray-900">#{order.id_sales_order} · {order.company_name}</p>
@@ -92,11 +123,14 @@ export function CreateTicketForm({
         </p>
       </div>
 
+      {/* Tipo */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">Tipo *</label>
         <div className="flex gap-3">
           {(['devolucao', 'garantia'] as TicketTipo[]).map(t => (
-            <label key={t} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border cursor-pointer transition-colors ${tipo === t ? 'border-zf-blue bg-zf-blue-light text-zf-blue' : 'border-gray-200 hover:border-gray-300'}`}>
+            <label key={t} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border cursor-pointer transition-colors ${
+              tipo === t ? 'border-zf-blue bg-zf-blue-light text-zf-blue' : 'border-gray-200 hover:border-gray-300'
+            }`}>
               <input type="radio" name="tipo" value={t} checked={tipo === t}
                 onChange={() => setTipo(t)} className="sr-only" />
               {t === 'devolucao' ? 'Devolução' : 'Garantia'}
@@ -105,11 +139,11 @@ export function CreateTicketForm({
         </div>
       </div>
 
+      {/* Subtipo garantia */}
       {tipo === 'garantia' && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de garantia</label>
-          <select value={subtipo} onChange={e => setSubtipo(e.target.value as TicketSubtipo)}
-            className="input">
+          <select value={subtipo} onChange={e => setSubtipo(e.target.value as TicketSubtipo)} className="input">
             <option value="">Selecione...</option>
             <option value="proxima_entrega">Próxima à entrega</option>
             <option value="pos_entrega">Pós-entrega ao cliente final</option>
@@ -118,16 +152,32 @@ export function CreateTicketForm({
         </div>
       )}
 
+      {/* Canal de entrada — pré-selecionado pelo playbook do seller */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Canal de entrada *</label>
-        <select value={canal} onChange={e => setCanal(e.target.value as CanalEntrada)} className="input">
-          <option value="whatsapp_individual">WhatsApp Individual</option>
-          <option value="whatsapp_grupo">WhatsApp Grupo</option>
-          <option value="email">E-mail</option>
-          <option value="outro">Outro</option>
-        </select>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Canal de entrada *
+          {canalPreenchido && (
+            <span className="ml-2 text-xs text-zf-blue font-normal">
+              pré-selecionado pelo playbook de {sellerNome || sellerPrincipal?.merchant_name}
+            </span>
+          )}
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {CANAIS.map(({ value, label }) => (
+            <label key={value} className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors text-sm ${
+              canal === value
+                ? 'border-zf-blue bg-zf-blue-light text-zf-blue font-medium'
+                : 'border-gray-200 hover:border-gray-300 text-gray-700'
+            }`}>
+              <input type="radio" name="canal" value={value} checked={canal === value}
+                onChange={() => setCanal(value)} className="sr-only" />
+              {label}
+            </label>
+          ))}
+        </div>
       </div>
 
+      {/* Motivo */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Motivo da devolução *</label>
         <textarea value={motivo} onChange={e => setMotivo(e.target.value)}
@@ -135,6 +185,7 @@ export function CreateTicketForm({
           placeholder="Descreva o motivo..." autoFocus />
       </div>
 
+      {/* Chave XML */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Chave XML da NF-e <span className="text-gray-400 font-normal">(opcional)</span>
