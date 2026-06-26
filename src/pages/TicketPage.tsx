@@ -150,8 +150,7 @@ export default function TicketPage() {
               <div><p className="text-xs text-gray-400">CNPJ</p><p className="font-medium">{formatarCNPJ(ticket.company_cnpj ?? '')}</p></div>
               <div><p className="text-xs text-gray-400">Seller</p><p className="font-medium">{ticket.merchant_name}</p></div>
               <div><p className="text-xs text-gray-400">Loja nº</p><p className="font-medium">{ticket.merchant_reference || '—'}</p></div>
-              <div><p className="text-xs text-gray-400">Motivo</p><p className="font-medium">{ticket.motivo}</p></div>
-              <div><p className="text-xs text-gray-400">Valor da devolução</p><p className="font-bold text-gray-900">{formatarMoeda(ticket.valor_total_devolucao)}</p></div>
+              <div className="col-span-2"><p className="text-xs text-gray-400">Motivo</p><p className="font-medium">{ticket.motivo}</p></div>
             </div>
             {ticket.order_vehicle && (
               <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-sm">
@@ -212,7 +211,7 @@ export default function TicketPage() {
                   <tr>
                     <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Item</th>
                     <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Qtd</th>
-                    <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Valor</th>
+
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -223,7 +222,7 @@ export default function TicketPage() {
                         <p className="text-xs text-gray-400">SKU: {item.item_sku}{item.item_brand ? ` · ${item.item_brand}` : ''}</p>
                       </td>
                       <td className="px-4 py-2.5 text-right text-gray-600">{item.qtd_devolvida}/{item.qtd_original}</td>
-                      <td className="px-4 py-2.5 text-right font-medium">{formatarMoeda(item.valor_devolvido)}</td>
+
                     </tr>
                   ))}
                 </tbody>
