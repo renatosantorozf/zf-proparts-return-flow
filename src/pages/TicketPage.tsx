@@ -4,6 +4,7 @@ import { ArrowLeft, Send, RefreshCw, Car, Package, FileText, MessageSquare, Copy
 import { useTicket, addLog, updateTicketStatus } from '@/hooks/useTickets'
 import { getSellerByRef } from '@/hooks/useSellers'
 import { MeiBadge } from '@/components/MeiBadge'
+import { TicketAttachments } from '@/components/TicketAttachments'
 import { formatarMoeda, formatarCNPJ, formatarChaveXML, gerarMensagem, templatePadrao } from '@/lib/formatters'
 import { formatarDataHora } from '@/lib/dateUtils'
 import type { TicketStatus, LogTipo, Seller } from '@/types'
@@ -228,6 +229,9 @@ export default function TicketPage() {
               </table>
             </div>
           )}
+
+          {/* Anexos */}
+          <TicketAttachments ticketId={ticket.id} />
 
           {/* Log */}
           <div className="card p-5 space-y-4">
