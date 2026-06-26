@@ -5,7 +5,7 @@ import { useTicket, addLog, updateTicketStatus } from '@/hooks/useTickets'
 import { getSellerByRef } from '@/hooks/useSellers'
 import { MeiBadge } from '@/components/MeiBadge'
 import { TicketAttachments } from '@/components/TicketAttachments'
-import { formatarMoeda, formatarCNPJ, formatarChaveXML, gerarMensagem, templatePadrao } from '@/lib/formatters'
+import { formatarMoeda, formatarCNPJ, formatarChaveXML, gerarMensagem, templateDevolucao, templateGarantia } from '@/lib/formatters'
 import { formatarDataHora } from '@/lib/dateUtils'
 import type { TicketStatus, LogTipo, Seller } from '@/types'
 import { STATUS_LABELS, KANBAN_COLUMNS } from '@/types'
@@ -48,7 +48,7 @@ export default function TicketPage() {
   function buildMsgVars() {
     if (!ticket) return {}
     const itensTxt = items.map(i =>
-      `  - ${i.item_name} (SKU: ${i.item_sku}) · Qtd: ${i.qtd_devolvida} · ${formatarMoeda(i.valor_devolvido)}`
+      `  - ${i.item_name} (SKU: ${i.item_sku}) - Qtd: ${i.qtd_devolvida}`
     ).join('\n')
     return {
       contato_seller: seller?.contato_nome || seller?.merchant_name || ticket.merchant_name || 'Equipe de Devoluções',
@@ -71,7 +71,8 @@ export default function TicketPage() {
   }
 
   function getTemplate(): string {
-    return seller?.template_mensagem || templatePadrao()
+    if (seller?.template_mensagem) return seller.template_mensagem
+    return ticket?.tipo === 'garantia' ? templateGarantia() : templateDevolucao()
   }
 
   function getMsgPreview(): string {
