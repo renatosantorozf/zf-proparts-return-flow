@@ -28,7 +28,6 @@ export function CreateTicketForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Seller principal (primeiro da lista)
   const sellerPrincipal = order.sellers[0]
 
   async function handleSubmit(e: React.FormEvent) {
@@ -37,10 +36,10 @@ export function CreateTicketForm({
     setLoading(true)
     setError('')
 
-    const result = await createTicket({
+    const ticketData: Record<string, unknown> = {
       order_id: order.id_sales_order,
       tipo,
-      subtipo: tipo === 'garantia' && subtipo ? subtipo as TicketSubtipo : undefined,
+      subtipo: tipo === 'garantia' && subtipo ? subtipo : null,
       status: 'aberto',
       canal_entrada: canal,
       motivo: motivo.trim(),
@@ -50,18 +49,32 @@ export function CreateTicketForm({
       order_city: order.order_city,
       order_state: order.order_state,
       order_vehicle: order.order_vehicle,
-      merchant_reference: sellerPrincipal?.merchant_reference,
-      merchant_name: sellerPrincipal?.merchant_name,
-      numero_nf: order.numero_nf,
-      chave_xml_nf: chaveXml || undefined,
+      merchant_reference: sellerPrincipal?.merchant_reference ?? null,
+      merchant_name: sellerPrincipal?.merchant_name ?? null,
+      numero_nf: order.numero_nf || null,
+      chave_xml_nf: chaveXml || null,
       mei_status: meiStatus,
       devolucao_tipo: devolucaoTipo,
       valor_total_devolucao: valorTotal,
-      created_by: user?.id,
+      created_by: user?.id ?? null,
       data_solicitacao: new Date().toISOString().split('T')[0],
-      order_created_at: order.order_created_at,
-    }, selectedItems)
+      order_created_at: order.order_created_at || null,
+    }
 
+    const items = selectedItems.map(i => ({
+      item_sku: i.item_sku,
+      item_brand: i.item_brand ?? null,
+      item_part_number: i.item_part_number ?? null,
+      item_name: i.item_name ?? null,
+      item_net_price: i.item_net_price ?? null,
+      qtd_original: i.qtd_original,
+      qtd_devolvida: i.qtd_devolvida,
+      valor_devolvido: i.valor_devolvido ?? null,
+      merchant_reference: i.merchant_reference ?? null,
+      merchant_name: i.merchant_name ?? null,
+    }))
+
+    const result = await createTicket(ticketData, items)
     setLoading(false)
     if (!result) { setError('Erro ao criar ticket. Tente novamente.'); return }
     navigate(`/tickets/${result.id}`)
@@ -79,7 +92,6 @@ export function CreateTicketForm({
         </p>
       </div>
 
-      {/* Tipo */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">Tipo *</label>
         <div className="flex gap-3">
@@ -93,7 +105,6 @@ export function CreateTicketForm({
         </div>
       </div>
 
-      {/* Subtipo (apenas garantia) */}
       {tipo === 'garantia' && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de garantia</label>
@@ -107,11 +118,9 @@ export function CreateTicketForm({
         </div>
       )}
 
-      {/* Canal de entrada */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Canal de entrada *</label>
-        <select value={canal} onChange={e => setCanal(e.target.value as CanalEntrada)}
-          className="input">
+        <select value={canal} onChange={e => setCanal(e.target.value as CanalEntrada)} className="input">
           <option value="whatsapp_individual">WhatsApp Individual</option>
           <option value="whatsapp_grupo">WhatsApp Grupo</option>
           <option value="email">E-mail</option>
@@ -119,48 +128,31 @@ export function CreateTicketForm({
         </select>
       </div>
 
-      {/* Motivo */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Motivo da devolução *</label>
-        <textarea
-          value={motivo}
-          onChange={e => setMotivo(e.target.value)}
-          className="input resize-none"
-          rows={3}
-          placeholder="Descreva o motivo da devolução ou garantia..."
-          autoFocus
-        />
+        <textarea value={motivo} onChange={e => setMotivo(e.target.value)}
+          className="input resize-none" rows={3}
+          placeholder="Descreva o motivo..." autoFocus />
       </div>
 
-      {/* Chave XML (se não veio automático) */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Chave XML da NF-e
-          <span className="text-gray-400 font-normal ml-1">(opcional — PAD-01)</span>
+          Chave XML da NF-e <span className="text-gray-400 font-normal">(opcional)</span>
         </label>
-        <input
-          type="text"
-          value={chaveXml}
+        <input type="text" value={chaveXml}
           onChange={e => setChaveXml(e.target.value.replace(/\D/g, ''))}
-          className="input font-mono text-sm"
-          placeholder="44 dígitos da chave de acesso"
-          maxLength={44}
-        />
+          className="input font-mono text-sm" placeholder="44 dígitos" maxLength={44} />
         {chaveXml && chaveXml.length !== 44 && (
-          <p className="text-xs text-amber-600 mt-1">Chave deve ter exatamente 44 dígitos ({chaveXml.length}/44)</p>
+          <p className="text-xs text-amber-600 mt-1">{chaveXml.length}/44 dígitos</p>
         )}
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">{error}</div>
       )}
 
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onBack} className="btn-secondary flex-1">
-          ← Voltar
-        </button>
+        <button type="button" onClick={onBack} className="btn-secondary flex-1">← Voltar</button>
         <button type="submit" disabled={loading || !motivo.trim()} className="btn-primary flex-1">
           {loading ? 'Criando...' : 'Criar Ticket'}
         </button>
