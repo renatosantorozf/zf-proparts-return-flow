@@ -289,14 +289,30 @@ export default function TicketPage() {
                 <a href="/playbook" className="underline">completar</a>
               </p>
             )}
-            <button onClick={() => { setMsgChannel('whatsapp'); setShowMsgModal(true) }}
-              className="btn-primary w-full text-sm flex items-center justify-center gap-2">
-              <Send size={14} /> Enviar WhatsApp
-            </button>
-            <button onClick={() => { setMsgChannel('email'); setShowMsgModal(true) }}
-              className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
-              <Send size={14} /> Enviar E-mail
-            </button>
+            {/* Botao primario = canal preferencial do seller */}
+            {seller?.canal_preferencial === 'email' ? (
+              <>
+                <button onClick={() => { setMsgChannel('email'); setShowMsgModal(true) }}
+                  className="btn-primary w-full text-sm flex items-center justify-center gap-2">
+                  <Send size={14} /> Enviar E-mail
+                </button>
+                <button onClick={() => { setMsgChannel('whatsapp'); setShowMsgModal(true) }}
+                  className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
+                  <Send size={14} /> Enviar WhatsApp
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => { setMsgChannel('whatsapp'); setShowMsgModal(true) }}
+                  className="btn-primary w-full text-sm flex items-center justify-center gap-2">
+                  <Send size={14} /> Enviar WhatsApp
+                </button>
+                <button onClick={() => { setMsgChannel('email'); setShowMsgModal(true) }}
+                  className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
+                  <Send size={14} /> Enviar E-mail
+                </button>
+              </>
+            )}
           </div>
 
           <div className="card p-4 space-y-3">
