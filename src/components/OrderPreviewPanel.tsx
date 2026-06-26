@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Copy, Check, Car, Package, FileText, Key } from 'lucide-react'
 import { MeiBadge } from './MeiBadge'
 import { useMei } from '@/hooks/useMei'
-import { formatarMoeda, formatarCNPJ, formatarChaveXML } from '@/lib/formatters'
+import { formatarCNPJ, formatarChaveXML } from '@/lib/formatters'
 import type { OrderPreview, OrderRow, TicketItem } from '@/types'
 
 interface SelectedItem extends Omit<TicketItem, 'id' | 'ticket_id'> {
@@ -41,11 +41,11 @@ const SELLER_COLORS = [
 export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPanelProps) {
   const { status: meiStatus } = useMei(order.company_cnpj)
 
-  // Checkboxes DESMARCADOS por padrao — analista seleciona o que quer devolver
+  // Cada linha da planilha = 1 item, qtd sempre 1, desmarcado por padrao
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>(() =>
     order.sellers.flatMap((s, si) =>
       s.items.map((item: OrderRow, ri: number) => ({
-        selected: false,  // DESMARCADO por padrao
+        selected: false,
         _sellerIdx: si,
         _rowIdx: ri,
         item_sku: item.item_sku,
@@ -53,9 +53,9 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
         item_part_number: item.item_part_number ?? undefined,
         item_name: item.item_name ?? undefined,
         item_net_price: item.item_net_price ?? undefined,
-        qtd_original: item.item_quantity ?? 1,
-        qtd_devolvida: item.item_quantity ?? 1,
-        valor_devolvido: (item.item_net_price ?? 0) * (item.item_quantity ?? 1),
+        qtd_original: 1,
+        qtd_devolvida: 1,
+        valor_devolvido: item.item_net_price ?? 0,
         merchant_reference: item.merchant_reference ?? undefined,
         merchant_name: item.merchant_name ?? s.merchant_name,
       }))
@@ -68,25 +68,13 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
     ))
   }
 
-  function updateQty(si: number, ri: number, qty: number) {
-    setSelectedItems(prev => prev.map(i => {
-      if (i._sellerIdx === si && i._rowIdx === ri) {
-        const q = Math.max(1, Math.min(qty, i.qtd_original))
-        return { ...i, qtd_devolvida: q, valor_devolvido: (i.item_net_price ?? 0) * q }
-      }
-      return i
-    }))
-  }
-
   const selected = selectedItems.filter(i => i.selected)
-  const valorTotal = selected.reduce((s, i) => s + (i.valor_devolvido ?? 0), 0)
-  const isTotal = selected.length === selectedItems.length && selected.length > 0 &&
-    selected.every(i => i.qtd_devolvida === i.qtd_original)
+  const isTotal = selected.length === selectedItems.length && selected.length > 0
 
   function handleConfirm() {
     if (selected.length === 0) return
     const items = selected.map(({ selected: _s, _sellerIdx: _si, _rowIdx: _ri, ...rest }) => rest)
-    onConfirm(items, isTotal ? 'total' : 'parcial', valorTotal)
+    onConfirm(items, isTotal ? 'total' : 'parcial', 0)
   }
 
   return (
@@ -161,8 +149,11 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
       <div className="space-y-3">
         <p className="text-sm font-medium text-gray-700 flex items-center gap-2">
           <Package size={15} />
-          Selecione os itens a devolver
-          <span className="text-xs text-gray-400 font-normal">(nenhum selecionado)</span>
+          Selecione os itens
+          {selected.length > 0
+            ? <span className="badge bg-zf-blue-light text-zf-blue">{selected.length} selecionado{selected.length > 1 ? 's' : ''}</span>
+            : <span className="text-xs text-gray-400 font-normal">(nenhum selecionado)</span>
+          }
         </p>
 
         {order.sellers.map((seller, si) => (
@@ -181,42 +172,29 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
                 const sel = selectedItems.find(s => s._sellerIdx === si && s._rowIdx === ri)
                 if (!sel) return null
                 return (
-                  <div
+                  <label
                     key={si + '-' + ri}
-                    className={'px-4 py-3 flex items-start gap-3 transition-colors ' + (sel.selected ? 'bg-white' : 'bg-gray-50/50')}
+                    className={'flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors ' +
+                      (sel.selected ? 'bg-blue-50' : 'hover:bg-gray-50')}
                   >
                     <input
                       type="checkbox"
                       checked={sel.selected}
                       onChange={() => toggleItem(si, ri)}
-                      className="mt-1 rounded border-gray-300 text-zf-blue focus:ring-zf-blue cursor-pointer"
+                      className="mt-0.5 rounded border-gray-300 text-zf-blue focus:ring-zf-blue cursor-pointer"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className={'text-sm font-medium leading-snug ' + (sel.selected ? 'text-gray-800' : 'text-gray-400')}>
+                      <p className={'text-sm font-medium leading-snug ' +
+                        (sel.selected ? 'text-gray-900' : 'text-gray-500')}>
                         {item.item_name}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        SKU: {item.item_sku}
+                        {item.item_sku}
                         {item.item_brand ? ' · ' + item.item_brand : ''}
-                        {item.item_part_number ? ' · ' + item.item_part_number : ''}
                         {item.item_state ? ' · ' + item.item_state : ''}
                       </p>
                     </div>
-                    {sel.selected && (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-xs text-gray-400">Qtd:</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={item.item_quantity ?? 1}
-                          value={sel.qtd_devolvida}
-                          onChange={e => updateQty(si, ri, parseInt(e.target.value) || 1)}
-                          className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:outline-none focus:border-zf-blue"
-                        />
-                        <span className="text-xs text-gray-400">/{item.item_quantity}</span>
-                      </div>
-                    )}
-                  </div>
+                  </label>
                 )
               })}
             </div>
@@ -224,24 +202,20 @@ export function OrderPreviewPanel({ order, onConfirm, onCancel }: OrderPreviewPa
         ))}
       </div>
 
-      {/* Resumo sticky */}
+      {/* Rodape */}
       <div className="card p-4 sticky bottom-0 bg-white border-t-2 border-zf-blue shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            {selected.length === 0 ? (
-              <p className="text-sm text-gray-400">Selecione ao menos 1 item</p>
-            ) : (
-              <>
-                <p className="text-sm text-gray-600">
+            {selected.length === 0
+              ? <p className="text-sm text-gray-400">Selecione ao menos 1 item</p>
+              : <p className="text-sm font-medium text-gray-800">
                   {selected.length} {selected.length === 1 ? 'item' : 'itens'} selecionado{selected.length > 1 ? 's' : ''}
                   {' · '}
-                  <span className={'font-medium ' + (isTotal ? 'text-gray-700' : 'text-amber-700')}>
-                    {isTotal ? 'Total' : 'Parcial'}
+                  <span className={isTotal ? 'text-gray-600' : 'text-amber-700'}>
+                    {isTotal ? 'Devolucao total' : 'Devolucao parcial'}
                   </span>
                 </p>
-                <p className="text-lg font-bold text-gray-900">{formatarMoeda(valorTotal)}</p>
-              </>
-            )}
+            }
           </div>
           <div className="flex gap-2">
             <button onClick={onCancel} className="btn-secondary text-sm">Cancelar</button>
