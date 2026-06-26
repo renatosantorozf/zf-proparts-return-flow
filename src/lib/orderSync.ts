@@ -121,7 +121,7 @@ export async function upsertOrders(rows: Record<string, unknown>[]): Promise<Ups
     const batch = rows.slice(i, i + BATCH_SIZE)
     const { error } = await db
       .from('orders')
-      .upsert(batch, { onConflict: 'id_sales_order,item_sku' })
+      .upsert(batch, { onConflict: 'id_sales_order,item_sku', ignoreDuplicates: true })
 
     if (error) {
       errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${error.message}`)
