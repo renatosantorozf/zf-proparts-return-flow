@@ -2,15 +2,5 @@ name = "returnflow"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
-# Static Assets: serve o build do Vite como site estático
 [assets]
 directory = "./dist"
-binding = "ASSETS"
-
-# SPA: redireciona tudo para index.html (React Router)
-[assets.serve_directly]
-enabled = true
-
-# Variáveis de ambiente (adicionar via dashboard ou wrangler secret)
-# VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY são injetadas no BUILD
-# pelo Cloudflare Workers Builds (environment variables)
