@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Send, RefreshCw, Car, Package, FileText, MessageSquare } from 'lucide-react'
 import { useTicket, addLog, updateTicketStatus } from '@/hooks/useTickets'
+import { getSellerByRef } from '@/hooks/useSellers'
 import { MeiBadge } from '@/components/MeiBadge'
 import { formatarMoeda, formatarCNPJ, formatarChaveXML, gerarMensagem, templatePadrao } from '@/lib/formatters'
 import { formatarDataHora } from '@/lib/dateUtils'
-import type { TicketStatus, LogTipo } from '@/types'
+import type { TicketStatus, LogTipo, Seller } from '@/types'
 import { STATUS_LABELS, KANBAN_COLUMNS } from '@/types'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -14,11 +15,19 @@ export default function TicketPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { ticket, items, logs, loading, refetch } = useTicket(id ?? '')
+  const [seller, setSeller] = useState<Seller | null>(null)
+
   const [logText, setLogText] = useState('')
   const [logTipo, setLogTipo] = useState<LogTipo>('whatsapp')
   const [savingLog, setSavingLog] = useState(false)
   const [showMsgModal, setShowMsgModal] = useState(false)
   const [msgChannel, setMsgChannel] = useState<'whatsapp' | 'email'>('whatsapp')
+
+  // Carrega seller do Playbook pelo merchant_reference do ticket
+  useEffect(() => {
+    if (!ticket?.merchant_reference) return
+    getSellerByRef(ticket.merchant_reference).then(s => setSeller(s))
+  }, [ticket?.merchant_reference])
 
   async function handleAddLog() {
     if (!logText.trim() || !id) return
@@ -50,29 +59,53 @@ export default function TicketPage() {
       seller_loja_id: ticket.merchant_reference ?? '',
       itens_devolvidos: itensTxt,
       numero_nf: ticket.numero_nf ?? 'Não informado',
-      chave_xml_nf: ticket.chave_xml_nf ? formatarChaveXML(ticket.chave_xml_nf) : '[Chave XML não informada]',
+      chave_xml_nf: ticket.chave_xml_nf
+        ? formatarChaveXML(ticket.chave_xml_nf)
+        : '[Chave XML não informada]',
       valor_total_devolucao: formatarMoeda(ticket.valor_total_devolucao),
       motivo: ticket.motivo,
       is_mei: ticket.mei_status === 'mei' ? 'Sim' : ticket.mei_status === 'nao_mei' ? 'Não' : 'Não verificado',
     }
   }
 
+  function getTemplate(): string {
+    // Usa template do seller se disponível, senão o padrão
+    return seller?.template_mensagem || templatePadrao()
+  }
+
   function handleSendWhatsApp() {
-    const msg = gerarMensagem(templatePadrao(), buildMsgVars())
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
-    if (id) addLog(id, 'whatsapp', 'Comunicação gerada — canal WhatsApp', user?.id).then(refetch)
+    const msg = gerarMensagem(getTemplate(), buildMsgVars())
+    // WhatsApp do seller do Playbook, ou abre sem destinatário
+    const tel = seller?.contato_whatsapp
+      ? seller.contato_whatsapp.replace(/\D/g, '')
+      : ''
+    const url = tel
+      ? `https://wa.me/55${tel}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`
+    window.open(url, '_blank')
+    if (id) addLog(id, 'whatsapp', `Comunicação gerada via WhatsApp${tel ? ` para ${seller?.contato_nome || tel}` : ''}`, user?.id).then(refetch)
     setShowMsgModal(false)
   }
 
   function handleSendEmail() {
-    const msg = gerarMensagem(templatePadrao(), buildMsgVars())
-    const subject = encodeURIComponent(`Solicitação de Devolução - Pedido ${ticket?.order_id}`)
-    window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(msg)}`
-    if (id) addLog(id, 'email', 'Comunicação gerada — canal E-mail', user?.id).then(refetch)
+    const msg = gerarMensagem(getTemplate(), buildMsgVars())
+    const email = seller?.contato_email ?? ''
+    const subject = `Solicitação de Devolução - Pedido ${ticket?.order_id}`
+
+    // Monta mailto com encoding correto para UTF-8
+    // encodeURIComponent garante que acentos não viram lixo
+    const mailto = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`
+    window.location.href = mailto
+
+    if (id) addLog(id, 'email', `Comunicação gerada via E-mail${email ? ` para ${email}` : ''}`, user?.id).then(refetch)
     setShowMsgModal(false)
   }
 
-  if (loading) return <div className="flex justify-center py-16"><RefreshCw size={28} className="animate-spin text-zf-blue" /></div>
+  if (loading) return (
+    <div className="flex justify-center py-16">
+      <RefreshCw size={28} className="animate-spin text-zf-blue" />
+    </div>
+  )
 
   if (!ticket) return (
     <div className="card p-12 text-center text-gray-400">
@@ -83,6 +116,7 @@ export default function TicketPage() {
 
   const canShowNfd = ticket.mei_status === 'nao_mei'
   const canalLabel = ticket.canal_entrada ? String(ticket.canal_entrada).replace(/_/g, ' ') : '—'
+  const msgPreview = gerarMensagem(getTemplate(), buildMsgVars())
 
   return (
     <div className="max-w-4xl space-y-5">
@@ -101,6 +135,7 @@ export default function TicketPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-4">
+          {/* Dados do pedido */}
           <div className="card p-5 space-y-4">
             <h2 className="font-semibold text-gray-800 flex items-center gap-2"><Package size={16} /> Dados do Pedido</h2>
             <div className="grid grid-cols-2 gap-3 text-sm">
@@ -121,15 +156,49 @@ export default function TicketPage() {
                 <FileText size={14} className="text-gray-400" />
                 <span className="text-gray-600">NF:</span>
                 <span className="font-mono font-medium">{ticket.numero_nf}</span>
-                {ticket.chave_xml_nf && <span className="text-xs text-gray-400 font-mono">· {formatarChaveXML(ticket.chave_xml_nf).slice(0,20)}...</span>}
               </div>
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <MeiBadge status={ticket.mei_status ?? 'nao_verificado'} />
               {ticket.devolucao_tipo === 'parcial' && <span className="badge bg-amber-100 text-amber-700">Devolução parcial</span>}
             </div>
           </div>
 
+          {/* Playbook do seller */}
+          {seller && (seller.instrucoes || seller.contato_whatsapp || seller.contato_email || seller.url_formulario) && (
+            <div className="card p-5 space-y-3 border-l-4 border-zf-blue">
+              <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+                📋 Processo — {seller.merchant_name}
+              </h2>
+              {seller.instrucoes && (
+                <div className="bg-blue-50 rounded-lg p-3">
+                  <p className="text-sm text-blue-900 whitespace-pre-wrap">{seller.instrucoes}</p>
+                </div>
+              )}
+              {seller.regras_excecao && (
+                <div className="bg-amber-50 rounded-lg p-3">
+                  <p className="text-xs font-medium text-amber-700 mb-1">⚠️ Regras / Exceções</p>
+                  <p className="text-sm text-amber-900 whitespace-pre-wrap">{seller.regras_excecao}</p>
+                </div>
+              )}
+              {seller.url_formulario && (
+                <a href={seller.url_formulario} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-purple-700 hover:underline">
+                  🔗 Abrir formulário do seller
+                </a>
+              )}
+            </div>
+          )}
+          {seller && !seller.instrucoes && !seller.contato_whatsapp && !seller.contato_email && (
+            <div className="card p-4 border border-amber-200 bg-amber-50">
+              <p className="text-sm text-amber-800 flex items-center gap-2">
+                ⚠️ Playbook do seller não configurado —{' '}
+                <a href="/playbook" className="underline font-medium">completar cadastro</a>
+              </p>
+            </div>
+          )}
+
+          {/* Itens */}
           {items.length > 0 && (
             <div className="card overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800 text-sm">Itens ({items.length})</div>
@@ -144,7 +213,10 @@ export default function TicketPage() {
                 <tbody className="divide-y divide-gray-50">
                   {items.map(item => (
                     <tr key={item.item_sku}>
-                      <td className="px-4 py-2.5"><p className="font-medium text-gray-800">{item.item_name}</p><p className="text-xs text-gray-400">SKU: {item.item_sku}{item.item_brand ? ` · ${item.item_brand}` : ''}</p></td>
+                      <td className="px-4 py-2.5">
+                        <p className="font-medium text-gray-800">{item.item_name}</p>
+                        <p className="text-xs text-gray-400">SKU: {item.item_sku}{item.item_brand ? ` · ${item.item_brand}` : ''}</p>
+                      </td>
                       <td className="px-4 py-2.5 text-right text-gray-600">{item.qtd_devolvida}/{item.qtd_original}</td>
                       <td className="px-4 py-2.5 text-right font-medium">{formatarMoeda(item.valor_devolvido)}</td>
                     </tr>
@@ -154,16 +226,23 @@ export default function TicketPage() {
             </div>
           )}
 
+          {/* Log */}
           <div className="card p-5 space-y-4">
             <h2 className="font-semibold text-gray-800 flex items-center gap-2"><MessageSquare size={16} /> Histórico</h2>
             <div className="space-y-3 max-h-64 overflow-y-auto">
               {logs.length === 0 ? <p className="text-sm text-gray-400">Nenhuma atualização registrada.</p> : (
                 logs.map(log => (
                   <div key={log.id} className="flex gap-3 text-sm">
-                    <div className="shrink-0 mt-0.5">
-                      <span className={`badge text-xs ${log.tipo === 'sistema' ? 'bg-gray-100 text-gray-500' : log.tipo === 'whatsapp' ? 'bg-green-100 text-green-700' : log.tipo === 'email' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{log.tipo}</span>
+                    <span className={`badge text-xs shrink-0 mt-0.5 ${
+                      log.tipo === 'sistema' ? 'bg-gray-100 text-gray-500' :
+                      log.tipo === 'whatsapp' ? 'bg-green-100 text-green-700' :
+                      log.tipo === 'email' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>{log.tipo}</span>
+                    <div className="flex-1">
+                      <p className="text-gray-800">{log.mensagem}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatarDataHora(log.created_at)}</p>
                     </div>
-                    <div className="flex-1"><p className="text-gray-800">{log.mensagem}</p><p className="text-xs text-gray-400 mt-0.5">{formatarDataHora(log.created_at)}</p></div>
                   </div>
                 ))
               )}
@@ -175,7 +254,8 @@ export default function TicketPage() {
                 <option value="ligacao">Ligação</option>
                 <option value="outro">Outro</option>
               </select>
-              <textarea value={logText} onChange={e => setLogText(e.target.value)} placeholder="Registrar atualização..." className="input resize-none text-sm" rows={2} />
+              <textarea value={logText} onChange={e => setLogText(e.target.value)}
+                placeholder="Registrar atualização..." className="input resize-none text-sm" rows={2} />
               <button onClick={handleAddLog} disabled={!logText.trim() || savingLog} className="btn-primary text-sm">
                 {savingLog ? 'Salvando...' : 'Registrar'}
               </button>
@@ -183,16 +263,31 @@ export default function TicketPage() {
           </div>
         </div>
 
+        {/* Sidebar */}
         <div className="space-y-4">
           <div className="card p-4 space-y-3">
             <h3 className="font-semibold text-gray-800 text-sm">Comunicar com Seller</h3>
-            <button onClick={() => { setMsgChannel('whatsapp'); setShowMsgModal(true) }} className="btn-primary w-full text-sm flex items-center justify-center gap-2">
+            {seller?.contato_whatsapp && (
+              <p className="text-xs text-gray-500">📱 {seller.contato_nome || seller.merchant_name} · {seller.contato_whatsapp}</p>
+            )}
+            {seller?.contato_email && (
+              <p className="text-xs text-gray-500">✉️ {seller.contato_email}</p>
+            )}
+            {!seller?.contato_whatsapp && !seller?.contato_email && (
+              <p className="text-xs text-amber-600">⚠️ Contatos não cadastrados no Playbook</p>
+            )}
+            <button
+              onClick={() => { setMsgChannel('whatsapp'); setShowMsgModal(true) }}
+              className="btn-primary w-full text-sm flex items-center justify-center gap-2">
               <Send size={14} /> Enviar WhatsApp
             </button>
-            <button onClick={() => { setMsgChannel('email'); setShowMsgModal(true) }} className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
+            <button
+              onClick={() => { setMsgChannel('email'); setShowMsgModal(true) }}
+              className="btn-secondary w-full text-sm flex items-center justify-center gap-2">
               <Send size={14} /> Enviar E-mail
             </button>
           </div>
+
           <div className="card p-4 space-y-3">
             <h3 className="font-semibold text-gray-800 text-sm">Alterar Status</h3>
             <div className="space-y-1.5">
@@ -207,6 +302,7 @@ export default function TicketPage() {
                 ))}
             </div>
           </div>
+
           <div className="card p-4 space-y-2 text-xs text-gray-500">
             <p>Aberto em: {new Date(ticket.created_at).toLocaleDateString('pt-BR')}</p>
             <p>Solicitação: {new Date(ticket.data_solicitacao).toLocaleDateString('pt-BR')}</p>
@@ -215,16 +311,31 @@ export default function TicketPage() {
         </div>
       </div>
 
+      {/* Modal pré-visualização */}
       {showMsgModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg space-y-4 p-6">
-            <h3 className="font-bold text-gray-900">Pré-visualização da mensagem</h3>
-            <pre className="bg-gray-50 rounded-lg p-4 text-xs text-gray-700 whitespace-pre-wrap overflow-auto max-h-64 font-sans">
-              {gerarMensagem(templatePadrao(), buildMsgVars())}
+            <div>
+              <h3 className="font-bold text-gray-900">Pré-visualização da mensagem</h3>
+              {msgChannel === 'email' && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Para: <span className="font-medium">{seller?.contato_email || '(sem e-mail cadastrado)'}</span>
+                </p>
+              )}
+              {msgChannel === 'whatsapp' && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Para: <span className="font-medium">{seller?.contato_whatsapp || '(sem WhatsApp cadastrado)'}</span>
+                </p>
+              )}
+            </div>
+            <pre className="bg-gray-50 rounded-lg p-4 text-xs text-gray-700 whitespace-pre-wrap overflow-auto max-h-72 font-sans leading-relaxed">
+              {msgPreview}
             </pre>
             <div className="flex gap-3">
               <button onClick={() => setShowMsgModal(false)} className="btn-secondary flex-1 text-sm">Cancelar</button>
-              <button onClick={msgChannel === 'whatsapp' ? handleSendWhatsApp : handleSendEmail} className="btn-primary flex-1 text-sm">
+              <button
+                onClick={msgChannel === 'whatsapp' ? handleSendWhatsApp : handleSendEmail}
+                className="btn-primary flex-1 text-sm">
                 {msgChannel === 'whatsapp' ? '📱 Abrir WhatsApp' : '📧 Abrir E-mail'}
               </button>
             </div>
