@@ -13,12 +13,6 @@ export function formatarChaveXML(chave: string): string {
   return (chave ?? '').replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ').trim()
 }
 
-export function formatarWhatsApp(tel: string): string {
-  const n = (tel ?? '').replace(/\D/g, '')
-  if (n.startsWith('55')) return n
-  return '55' + n
-}
-
 export function formatarVeiculo(raw: string | null | undefined): string {
   if (!raw) return ''
   const s = raw.trim()
@@ -33,7 +27,7 @@ export function formatarVeiculo(raw: string | null | undefined): string {
     if (v.variant && String(v.variant).length <= 40) parts.push(String(v.variant))
     const plate = obj.license_plate ?? v.license_plate
     const label = parts.join(' ')
-    return plate ? `${label} - ${plate}` : label
+    return plate ? label + ' - ' + plate : label
   } catch {
     return s.length > 60 ? s.slice(0, 57) + '...' : s
   }
@@ -56,10 +50,10 @@ export function extrairNumeroNF(nfRaw: string | null | undefined): { numero: str
 }
 
 export function gerarMensagem(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`)
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? ('{{' + key + '}}'))
 }
 
-export function templatePadrao(): string {
+export function templateDevolucao(): string {
   return `Ola, {{contato_seller}}!
 
 Solicito autorizacao de devolucao referente ao pedido abaixo:
@@ -76,7 +70,6 @@ Itens a devolver:
 
 Nota Fiscal n: {{numero_nf}}
 Chave de Acesso NF-e: {{chave_xml_nf}}
-Valor total da devolucao: {{valor_total_devolucao}}
 Motivo: {{motivo}}
 Cliente MEI: {{is_mei}}
 
@@ -84,4 +77,35 @@ Aguardo o retorno com as instrucoes para prosseguir.
 
 Atenciosamente,
 ZF [pro]Parts`
+}
+
+export function templateGarantia(): string {
+  return `Ola, {{contato_seller}}!
+
+Solicito garantia referente ao pedido abaixo:
+
+Pedido: #{{order_id}}
+Empresa: {{cliente_nome}}
+CNPJ: {{cnpj_cliente}}
+Veiculo: {{order_vehicle}}
+Data da Solicitacao: {{data_solicitacao}}
+Seller: {{seller_nome}} | Loja n {{seller_loja_id}}
+
+Itens com solicitacao de garantia:
+{{itens_devolvidos}}
+
+Nota Fiscal n: {{numero_nf}}
+Chave de Acesso NF-e: {{chave_xml_nf}}
+Motivo: {{motivo}}
+Cliente MEI: {{is_mei}}
+
+Aguardo o retorno com as instrucoes para prosseguir.
+
+Atenciosamente,
+ZF [pro]Parts`
+}
+
+// Compatibilidade — mantido para nao quebrar imports existentes
+export function templatePadrao(): string {
+  return templateDevolucao()
 }
