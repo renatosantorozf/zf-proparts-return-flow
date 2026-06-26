@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { db } from '@/lib/db'
 import type { OrderPreview, OrderRow } from '@/types'
+import { formatarVeiculo, extrairNumeroNF } from '@/lib/formatters'
 
 interface UseOrdersParams {
   search?: string
@@ -23,6 +24,12 @@ function groupRows(rows: OrderRow[]): OrderPreview[] {
   for (const row of rows) {
     const id = row.id_sales_order
     if (!map.has(id)) {
+      // Normaliza veículo (pode ser JSON)
+      const veiculoFormatado = formatarVeiculo(row.order_vehicle ?? '')
+      // Normaliza NF (pode ser chave XML completa ou número)
+      const nfRaw = row.item_nota_fiscal ?? ''
+      const { numero: numeroNF, chave: chaveNF } = extrairNumeroNF(nfRaw)
+
       map.set(id, {
         id_sales_order: id,
         company_name: row.company_name ?? '',
@@ -30,11 +37,11 @@ function groupRows(rows: OrderRow[]): OrderPreview[] {
         customer_email: row.customer_email ?? '',
         order_city: row.order_city ?? '',
         order_state: row.order_state ?? '',
-        order_vehicle: row.order_vehicle ?? '',
+        order_vehicle: veiculoFormatado,
         order_created_at: row.order_created_at ?? '',
         order_paid_date: row.order_paid_date ?? '',
-        numero_nf: row.item_nota_fiscal ?? '',
-        chave_xml_nf: row.item_chave_xml_nf ?? '',
+        numero_nf: numeroNF,
+        chave_xml_nf: chaveNF || (row.item_chave_xml_nf ?? ''),
         sellers: [],
       })
     }
@@ -50,10 +57,9 @@ function groupRows(rows: OrderRow[]): OrderPreview[] {
   return Array.from(map.values())
 }
 
-// Detecta o tipo de busca pelo conteúdo digitado
 function detectSearchType(q: string): 'order_id' | 'cnpj' | 'company' {
   const clean = q.replace(/\D/g, '')
-  if (/^\d+$/.test(q.trim()) && q.trim().length >= 6) return 'order_id'
+  if (/^\d+$/.test(q.trim()) && q.trim().length >= 4) return 'order_id'
   if (clean.length === 14) return 'cnpj'
   return 'company'
 }
@@ -84,7 +90,6 @@ export function useOrders({
           } else if (type === 'cnpj') {
             q = q.eq('company_cnpj', search.replace(/\D/g, ''))
           } else {
-            // Busca por nome da empresa — ilike para busca parcial
             q = q.ilike('company_name', `%${search.trim()}%`)
           }
         }
@@ -99,12 +104,11 @@ export function useOrders({
         const offset = (page - 1) * pageSize
         const { data: idRows, count, error: idErr } = await q
           .order('order_created_at', { ascending: false })
-          .range(offset, offset + pageSize * 5 - 1) // busca mais para deduplcar
+          .range(offset, offset + pageSize * 5 - 1)
 
         if (idErr) throw new Error(idErr.message)
         if (cancelled) return
 
-        // Deduplica IDs mantendo ordem
         const seen = new Set<string>()
         const ids: string[] = []
         for (const r of (idRows ?? []) as { id_sales_order: string }[]) {
@@ -119,19 +123,15 @@ export function useOrders({
         if (ids.length === 0) { setOrders([]); setLoading(false); return }
 
         const { data: rows, error: rowErr } = await db
-          .from('orders')
-          .select('*')
-          .in('id_sales_order', ids)
+          .from('orders').select('*').in('id_sales_order', ids)
 
         if (rowErr) throw new Error(rowErr.message)
         if (cancelled) return
 
-        // Mantém a ordem dos IDs
         const grouped = groupRows((rows ?? []) as OrderRow[])
         const ordered = ids
           .map(id => grouped.find(o => o.id_sales_order === id))
           .filter(Boolean) as OrderPreview[]
-
         setOrders(ordered)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Erro ao carregar pedidos')
@@ -165,10 +165,7 @@ export async function searchOrders(query: string): Promise<OrderPreview[]> {
     q = q.ilike('company_name', `%${query.trim()}%`)
   }
 
-  const { data } = await q
-    .order('order_created_at', { ascending: false })
-    .limit(200)
-
+  const { data } = await q.order('order_created_at', { ascending: false }).limit(200)
   if (!data || (data as unknown[]).length === 0) return []
   return groupRows(data as OrderRow[])
 }
