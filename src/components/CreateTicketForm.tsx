@@ -36,7 +36,7 @@ export function CreateTicketForm({
   const [subtipo, setSubtipo] = useState<TicketSubtipo | ''>('')
   const [motivo, setMotivo] = useState('')
   const [canal, setCanal] = useState<CanalEntrada>('whatsapp_individual')
-  const [chaveXml, setChaveXml] = useState('')  // sempre vazio — analista preenche se souber
+  const [chaveXml, setChaveXml] = useState(order.chave_xml_nf ?? '')  // pré-preenchido da planilha
   const [error, setError] = useState('')
   const [sellerNome, setSellerNome] = useState<string>('')
   const [canalPreenchido, setCanalPreenchido] = useState(false)
