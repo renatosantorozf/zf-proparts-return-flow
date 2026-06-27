@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useTickets, updateTicketStatus } from '@/hooks/useTickets'
+import { useMetrics } from '@/hooks/useMetrics'
 import { useSla } from '@/hooks/useSla'
 import { calcularDiasUteis } from '@/lib/dateUtils'
 import { formatarMoeda } from '@/lib/formatters'
@@ -142,6 +143,7 @@ function KanbanColumn({ status, tickets, getSlaInfo, onCardClick, onDrop }: {
 export default function KanbanPage() {
   const navigate = useNavigate()
   const { tickets, loading, refetch } = useTickets()
+  const { summary } = useMetrics(30)
   const { getSlaInfo } = useSla()
 
   const criticalTotal = tickets.filter(t =>
@@ -182,6 +184,51 @@ export default function KanbanPage() {
           </button>
         </div>
       </div>
+
+      {/* Cards MTTR resumo */}
+      {summary && summary.total_tickets > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="card px-4 py-3 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-zf-blue-light flex items-center justify-center shrink-0">
+              <span className="text-zf-blue font-bold text-xs">{summary.total_tickets}</span>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Tickets (30d)</p>
+              <p className="text-sm font-semibold text-gray-800">{summary.abertos} abertos</p>
+            </div>
+          </div>
+          <div className="card px-4 py-3 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+              <span className="text-amber-600 font-bold text-xs">T1</span>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">MTTR Autorizacao</p>
+              <p className="text-sm font-semibold text-gray-800">
+                {summary.mttr_autorizacao_media_horas !== null
+                  ? (summary.mttr_autorizacao_media_horas < 24
+                    ? summary.mttr_autorizacao_media_horas.toFixed(1) + 'h'
+                    : (summary.mttr_autorizacao_media_horas / 24).toFixed(1) + ' dias')
+                  : '—'}
+              </p>
+            </div>
+          </div>
+          <div className="card px-4 py-3 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+              <span className="text-purple-600 font-bold text-xs">T2</span>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">MTTR Logistica</p>
+              <p className="text-sm font-semibold text-gray-800">
+                {summary.mttr_logistica_media_horas !== null
+                  ? (summary.mttr_logistica_media_horas < 24
+                    ? summary.mttr_logistica_media_horas.toFixed(1) + 'h'
+                    : (summary.mttr_logistica_media_horas / 24).toFixed(1) + ' dias')
+                  : '—'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16">
