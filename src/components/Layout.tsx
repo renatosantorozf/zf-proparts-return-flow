@@ -1,7 +1,7 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Package, BookOpen, Settings, LogOut, RefreshCw } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
-import { useSyncStatus } from '@/hooks/useSyncStatus'
+import { BarChart2, Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { BarChart2, LayoutDashboard, Package, BookOpen, Settings, LogOut, RefreshCw } from 'lucide-react'
+import { BarChart2, useAuth } from '@/hooks/useAuth'
+import { BarChart2, useSyncStatus } from '@/hooks/useSyncStatus'
 
 export default function Layout() {
   const { signOut } = useAuth()
