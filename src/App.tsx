@@ -6,6 +6,7 @@ import PedidosPage from '@/pages/PedidosPage'
 import TicketPage from '@/pages/TicketPage'
 import PlaybookPage from '@/pages/PlaybookPage'
 import ConfigPage from '@/pages/ConfigPage'
+import MetricasPage from '@/pages/MetricasPage'
 import Layout from '@/components/Layout'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
