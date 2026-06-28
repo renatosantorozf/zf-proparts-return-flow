@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, AlertTriangle, RefreshCw, Filter } from 'lucide-react'
 import { useTickets, updateTicketStatus } from '@/hooks/useTickets'
+import { db } from '@/lib/db'
 import { useSla } from '@/hooks/useSla'
 import { calcularDiasUteis } from '@/lib/dateUtils'
 import { formatarMoeda } from '@/lib/formatters'
@@ -139,10 +140,42 @@ function KanbanColumn({ status, tickets, getSlaInfo, onCardClick, onDrop }: {
   )
 }
 
+const COLUNAS_ATIVAS: TicketStatus[] = [
+  'aberto', 'contato_enviado', 'aguardando_autorizacao',
+  'autorizado', 'nfd_pendente', 'logistica_reversa_concluida'
+]
+
 export default function KanbanPage() {
   const navigate = useNavigate()
   const { tickets, loading, refetch } = useTickets()
   const { getSlaInfo } = useSla()
+  const [filtroSemAtividade, setFiltroSemAtividade] = useState(false)
+  const [ticketsSemAtividadeHoje, setTicketsSemAtividadeHoje] = useState<Set<string>>(new Set())
+
+  // Busca tickets ativos que tiveram log hoje
+  useEffect(() => {
+    async function loadAtividade() {
+      const hoje = new Date()
+      const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString()
+
+      const idsAtivos = tickets
+        .filter(t => COLUNAS_ATIVAS.includes(t.status as TicketStatus))
+        .map(t => t.id)
+
+      if (idsAtivos.length === 0) { setTicketsSemAtividadeHoje(new Set()); return }
+
+      const { data: logsHoje } = await db
+        .from('ticket_logs')
+        .select('ticket_id')
+        .in('ticket_id', idsAtivos)
+        .gte('created_at', inicioHoje)
+
+      const comAtividade = new Set(((logsHoje ?? []) as { ticket_id: string }[]).map(l => l.ticket_id))
+      const semAtividade = new Set(idsAtivos.filter(id => !comAtividade.has(id)))
+      setTicketsSemAtividadeHoje(semAtividade)
+    }
+    if (!loading) loadAtividade()
+  }, [tickets, loading])
 
   const criticalTotal = tickets.filter(t =>
     !['encerrado', 'recusado'].includes(t.status) &&
@@ -156,8 +189,11 @@ export default function KanbanPage() {
     refetch()
   }
 
-  const columnTickets = (status: TicketStatus) =>
-    tickets.filter(t => t.status === status)
+  const columnTickets = (status: TicketStatus) => {
+    const base = tickets.filter(t => t.status === status)
+    if (!filtroSemAtividade || !COLUNAS_ATIVAS.includes(status)) return base
+    return base.filter(t => ticketsSemAtividadeHoje.has(t.id))
+  }
 
   return (
     <div className="space-y-4 h-full">
@@ -174,6 +210,19 @@ export default function KanbanPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setFiltroSemAtividade(f => !f)}
+            className={'text-sm flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-colors ' +
+              (filtroSemAtividade
+                ? 'border-amber-400 bg-amber-50 text-amber-700 font-medium'
+                : 'border-gray-200 text-gray-600 hover:border-gray-300')}
+          >
+            <Filter size={14} />
+            Sem atividade hoje
+            {filtroSemAtividade && ticketsSemAtividadeHoje.size > 0 && (
+              <span className="badge bg-amber-200 text-amber-800 ml-1">{ticketsSemAtividadeHoje.size}</span>
+            )}
+          </button>
           <button onClick={refetch} className="btn-ghost text-sm flex items-center gap-1.5">
             <RefreshCw size={14} /> Atualizar
           </button>
