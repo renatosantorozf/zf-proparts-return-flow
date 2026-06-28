@@ -37,6 +37,8 @@ function AppRoutes() {
         <Route path="pedidos" element={<PedidosPage />} />
         <Route path="tickets/:id" element={<TicketPage />} />
         <Route path="playbook" element={<PlaybookPage />} />
+        <Route path="oficinas" element={<OficinasPage />} />
+        <Route path="metricas" element={<MetricasPage />} />
         <Route path="config" element={<ConfigPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/kanban" replace />} />
