@@ -117,14 +117,36 @@ export async function upsertOrders(rows: Record<string, unknown>[]): Promise<Ups
   const errors: string[] = []
   let rowsUpserted = 0
 
+  // Agrupa linhas por order_id para fazer delete+insert por pedido
+  // Isso garante que reimportacoes nao acumulem linhas duplicadas
+  const byOrder = new Map<string, Record<string, unknown>[]>()
+  for (const row of rows) {
+    const id = row.id_sales_order as string
+    if (!byOrder.has(id)) byOrder.set(id, [])
+    byOrder.get(id)!.push(row)
+  }
+
+  const orderIds = Array.from(byOrder.keys())
+
+  // Delete em batches de order_ids (max 100 por vez para nao estourar URL)
+  const ID_BATCH = 100
+  for (let i = 0; i < orderIds.length; i += ID_BATCH) {
+    const idBatch = orderIds.slice(i, i + ID_BATCH)
+    const { error: delErr } = await db
+      .from('orders')
+      .delete()
+      .in('id_sales_order', idBatch)
+    if (delErr) {
+      errors.push('Delete batch ' + Math.floor(i / ID_BATCH + 1) + ': ' + delErr.message)
+    }
+  }
+
+  // Insert em batches de linhas
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE)
-    const { error } = await db
-      .from('orders')
-      .upsert(batch, { onConflict: 'id_sales_order,item_sku,item_state,item_discount_value', ignoreDuplicates: true })
-
+    const { error } = await db.from('orders').insert(batch)
     if (error) {
-      errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${error.message}`)
+      errors.push('Insert batch ' + (Math.floor(i / BATCH_SIZE) + 1) + ': ' + error.message)
     } else {
       rowsUpserted += batch.length
     }
