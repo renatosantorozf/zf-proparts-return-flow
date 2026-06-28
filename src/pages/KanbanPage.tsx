@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, AlertTriangle, RefreshCw, Filter } from 'lucide-react'
+import { Plus, AlertTriangle, RefreshCw, Filter, Search, X } from 'lucide-react'
 import { useTickets, updateTicketStatus } from '@/hooks/useTickets'
 import { db } from '@/lib/db'
 import { useSla } from '@/hooks/useSla'
@@ -151,6 +151,11 @@ export default function KanbanPage() {
   const { getSlaInfo } = useSla()
   const [filtroSemAtividade, setFiltroSemAtividade] = useState(false)
   const [ticketsSemAtividadeHoje, setTicketsSemAtividadeHoje] = useState<Set<string>>(new Set())
+  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'devolucao' | 'garantia'>('todos')
+  const [filtroSla, setFiltroSla] = useState(false)
+  const [buscaSeller, setBuscaSeller] = useState('')
+  const [buscaCliente, setBuscaCliente] = useState('')
+  const [showFiltros, setShowFiltros] = useState(false)
 
   // Busca tickets ativos que tiveram log hoje
   useEffect(() => {
@@ -189,10 +194,42 @@ export default function KanbanPage() {
     refetch()
   }
 
+  const filtrosAtivos = (filtroSemAtividade ? 1 : 0) +
+    (filtroTipo !== 'todos' ? 1 : 0) +
+    (filtroSla ? 1 : 0) +
+    (buscaSeller.trim() ? 1 : 0) +
+    (buscaCliente.trim() ? 1 : 0)
+
   const columnTickets = (status: TicketStatus) => {
-    const base = tickets.filter(t => t.status === status)
-    if (!filtroSemAtividade || !COLUNAS_ATIVAS.includes(status)) return base
-    return base.filter(t => ticketsSemAtividadeHoje.has(t.id))
+    let base = tickets.filter(t => t.status === status)
+
+    // Filtro sem atividade hoje (apenas colunas ativas)
+    if (filtroSemAtividade && COLUNAS_ATIVAS.includes(status)) {
+      base = base.filter(t => ticketsSemAtividadeHoje.has(t.id))
+    }
+    // Filtro por tipo
+    if (filtroTipo !== 'todos') {
+      base = base.filter(t => t.tipo === filtroTipo)
+    }
+    // Filtro SLA estourado (apenas colunas ativas)
+    if (filtroSla && COLUNAS_ATIVAS.includes(status)) {
+      base = base.filter(t => getSlaInfo(t.status, t.created_at).status === 'critical')
+    }
+    // Busca por seller
+    if (buscaSeller.trim()) {
+      base = base.filter(t =>
+        (t.merchant_name ?? '').toLowerCase().includes(buscaSeller.toLowerCase()) ||
+        (t.merchant_reference ?? '').toLowerCase().includes(buscaSeller.toLowerCase())
+      )
+    }
+    // Busca por cliente
+    if (buscaCliente.trim()) {
+      base = base.filter(t =>
+        (t.company_name ?? '').toLowerCase().includes(buscaCliente.toLowerCase())
+      )
+    }
+
+    return base
   }
 
   return (
@@ -211,16 +248,16 @@ export default function KanbanPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setFiltroSemAtividade(f => !f)}
+            onClick={() => setShowFiltros(f => !f)}
             className={'text-sm flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-colors ' +
-              (filtroSemAtividade
-                ? 'border-amber-400 bg-amber-50 text-amber-700 font-medium'
+              (filtrosAtivos > 0
+                ? 'border-zf-blue bg-zf-blue-light text-zf-blue font-medium'
                 : 'border-gray-200 text-gray-600 hover:border-gray-300')}
           >
             <Filter size={14} />
-            Sem atividade hoje
-            {filtroSemAtividade && ticketsSemAtividadeHoje.size > 0 && (
-              <span className="badge bg-amber-200 text-amber-800 ml-1">{ticketsSemAtividadeHoje.size}</span>
+            Filtros
+            {filtrosAtivos > 0 && (
+              <span className="badge bg-zf-blue text-white ml-1">{filtrosAtivos}</span>
             )}
           </button>
           <button onClick={refetch} className="btn-ghost text-sm flex items-center gap-1.5">
@@ -231,6 +268,117 @@ export default function KanbanPage() {
           </button>
         </div>
       </div>
+
+      {/* Painel de filtros */}
+      {showFiltros && (
+        <div className="card p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">Filtros do Kanban</p>
+            {filtrosAtivos > 0 && (
+              <button
+                onClick={() => {
+                  setFiltroSemAtividade(false)
+                  setFiltroTipo('todos')
+                  setFiltroSla(false)
+                  setBuscaSeller('')
+                  setBuscaCliente('')
+                }}
+                className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+              >
+                <X size={12} /> Limpar filtros
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Tipo */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1.5 font-medium">Tipo</p>
+              <div className="flex gap-1.5">
+                {(['todos', 'devolucao', 'garantia'] as const).map(t => (
+                  <button key={t} onClick={() => setFiltroTipo(t)}
+                    className={'text-xs px-2.5 py-1.5 rounded-lg border transition-colors ' +
+                      (filtroTipo === t
+                        ? 'border-zf-blue bg-zf-blue-light text-zf-blue font-medium'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300')}>
+                    {t === 'todos' ? 'Todos' : t === 'devolucao' ? 'Devolucao' : 'Garantia'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* SLA */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1.5 font-medium">SLA</p>
+              <button onClick={() => setFiltroSla(f => !f)}
+                className={'text-xs px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ' +
+                  (filtroSla
+                    ? 'border-red-400 bg-red-50 text-red-700 font-medium'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300')}>
+                <AlertTriangle size={12} />
+                SLA estourado
+              </button>
+            </div>
+
+            {/* Sem atividade */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1.5 font-medium">Atividade</p>
+              <button onClick={() => setFiltroSemAtividade(f => !f)}
+                className={'text-xs px-2.5 py-1.5 rounded-lg border transition-colors ' +
+                  (filtroSemAtividade
+                    ? 'border-amber-400 bg-amber-50 text-amber-700 font-medium'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300')}>
+                Sem atividade hoje
+                {filtroSemAtividade && ticketsSemAtividadeHoje.size > 0 && (
+                  <span className="ml-1 badge bg-amber-200 text-amber-800">{ticketsSemAtividadeHoje.size}</span>
+                )}
+              </button>
+            </div>
+
+            {/* Busca seller */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1.5 font-medium">Seller</p>
+              <div className="relative">
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={buscaSeller}
+                  onChange={e => setBuscaSeller(e.target.value)}
+                  placeholder="Buscar seller..."
+                  className="input pl-7 text-xs py-1.5"
+                />
+                {buscaSeller && (
+                  <button onClick={() => setBuscaSeller('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Busca cliente */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1.5 font-medium">Cliente / Oficina</p>
+              <div className="relative">
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={buscaCliente}
+                  onChange={e => setBuscaCliente(e.target.value)}
+                  placeholder="Buscar cliente..."
+                  className="input pl-7 text-xs py-1.5"
+                />
+                {buscaCliente && (
+                  <button onClick={() => setBuscaCliente('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16">
