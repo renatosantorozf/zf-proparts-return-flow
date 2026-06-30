@@ -153,9 +153,7 @@ export default function KanbanPage() {
   const [ticketsSemAtividadeHoje, setTicketsSemAtividadeHoje] = useState<Set<string>>(new Set())
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'devolucao' | 'garantia'>('todos')
   const [filtroSla, setFiltroSla] = useState(false)
-  const [buscaSeller, setBuscaSeller] = useState('')
-  const [buscaCliente, setBuscaCliente] = useState('')
-  const [buscaPedido, setBuscaPedido] = useState('')
+  const [busca, setBusca] = useState('')
 
   // Busca tickets ativos que tiveram log hoje
   useEffect(() => {
@@ -197,9 +195,7 @@ export default function KanbanPage() {
   const filtrosAtivos = (filtroSemAtividade ? 1 : 0) +
     (filtroTipo !== 'todos' ? 1 : 0) +
     (filtroSla ? 1 : 0) +
-    (buscaSeller.trim() ? 1 : 0) +
-    (buscaCliente.trim() ? 1 : 0) +
-    (buscaPedido.trim() ? 1 : 0)
+    (busca.trim() ? 1 : 0)
 
   const columnTickets = (status: TicketStatus) => {
     let base = tickets.filter(t => t.status === status)
@@ -216,24 +212,15 @@ export default function KanbanPage() {
     if (filtroSla && COLUNAS_ATIVAS.includes(status)) {
       base = base.filter(t => getSlaInfo(t.status, t.created_at).status === 'critical')
     }
-    // Busca por seller
-    if (buscaSeller.trim()) {
+    // Busca unificada: seller, cliente ou pedido
+    if (busca.trim()) {
+      const q = busca.trim().toLowerCase()
       base = base.filter(t =>
-        (t.merchant_name ?? '').toLowerCase().includes(buscaSeller.toLowerCase()) ||
-        (t.merchant_reference ?? '').toLowerCase().includes(buscaSeller.toLowerCase())
-      )
-    }
-    // Busca por cliente
-    if (buscaCliente.trim()) {
-      base = base.filter(t =>
-        (t.company_name ?? '').toLowerCase().includes(buscaCliente.toLowerCase())
-      )
-    }
-    // Busca por pedido
-    if (buscaPedido.trim()) {
-      base = base.filter(t =>
-        String(t.order_id ?? '').includes(buscaPedido.trim()) ||
-        String(t.ticket_number ?? '').includes(buscaPedido.trim())
+        (t.merchant_name ?? '').toLowerCase().includes(q) ||
+        (t.merchant_reference ?? '').toLowerCase().includes(q) ||
+        (t.company_name ?? '').toLowerCase().includes(q) ||
+        String(t.order_id ?? '').includes(q) ||
+        String(t.ticket_number ?? '').includes(q)
       )
     }
 
@@ -303,37 +290,14 @@ export default function KanbanPage() {
 
           <div className="w-px h-5 bg-gray-200" />
 
-          {/* Busca seller */}
+          {/* Busca unificada */}
           <div className="relative">
             <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" value={buscaSeller} onChange={e => setBuscaSeller(e.target.value)}
-              placeholder="Seller..." className="border border-gray-200 rounded-lg pl-6 pr-6 py-1.5 text-xs focus:outline-none focus:border-zf-blue w-32" />
-            {buscaSeller && (
-              <button onClick={() => setBuscaSeller('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400">
-                <X size={11} />
-              </button>
-            )}
-          </div>
-
-          {/* Busca cliente */}
-          <div className="relative">
-            <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" value={buscaCliente} onChange={e => setBuscaCliente(e.target.value)}
-              placeholder="Cliente..." className="border border-gray-200 rounded-lg pl-6 pr-6 py-1.5 text-xs focus:outline-none focus:border-zf-blue w-36" />
-            {buscaCliente && (
-              <button onClick={() => setBuscaCliente('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400">
-                <X size={11} />
-              </button>
-            )}
-          </div>
-
-          {/* Busca pedido */}
-          <div className="relative">
-            <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" value={buscaPedido} onChange={e => setBuscaPedido(e.target.value)}
-              placeholder="Pedido..." className="border border-gray-200 rounded-lg pl-6 pr-6 py-1.5 text-xs focus:outline-none focus:border-zf-blue w-28" />
-            {buscaPedido && (
-              <button onClick={() => setBuscaPedido('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400">
+            <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
+              placeholder="Seller, cliente ou pedido..."
+              className="border border-gray-200 rounded-lg pl-6 pr-6 py-1.5 text-xs focus:outline-none focus:border-zf-blue w-52" />
+            {busca && (
+              <button onClick={() => setBusca('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400">
                 <X size={11} />
               </button>
             )}
@@ -344,7 +308,7 @@ export default function KanbanPage() {
             <>
               <div className="w-px h-5 bg-gray-200" />
               <button
-                onClick={() => { setFiltroSemAtividade(false); setFiltroTipo('todos'); setFiltroSla(false); setBuscaSeller(''); setBuscaCliente(''); setBuscaPedido('') }}
+                onClick={() => { setFiltroSemAtividade(false); setFiltroTipo('todos'); setFiltroSla(false); setBusca('') }}
                 className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1.5">
                 <X size={11} /> Limpar ({filtrosAtivos})
               </button>
