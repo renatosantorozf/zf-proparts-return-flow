@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { RefreshCw, TrendingDown, Clock, CheckCircle, AlertCircle, BarChart2, Trophy } from 'lucide-react'
 import { useMetrics } from '@/hooks/useMetrics'
 
