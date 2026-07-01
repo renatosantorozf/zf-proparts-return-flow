@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RefreshCw, TrendingDown, Clock, CheckCircle, AlertCircle, BarChart2 } from 'lucide-react'
+import { RefreshCw, TrendingDown, Clock, CheckCircle, AlertCircle, BarChart2, Trophy } from 'lucide-react'
 import { useMetrics } from '@/hooks/useMetrics'
 
 function MetricCard({
@@ -38,9 +38,110 @@ function getColorMTTR(horas: number | null, limiteOk: number, limiteCritico: num
   return 'text-red-600'
 }
 
+interface RankingItem {
+  name: string
+  total: number
+  abertos: number
+  encerrados: number
+  recusados: number
+}
+
+function useRankings(period: number) {
+  const [sellers, setSellers] = useState<RankingItem[]>([])
+  const [oficinas, setOficinas] = useState<RankingItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const since = new Date(Date.now() - period * 86400000).toISOString()
+      const { data } = await (await import('@/lib/db')).db
+        .from('tickets')
+        .select('merchant_name, company_name, status')
+        .gte('created_at', since)
+
+      if (!data) { setLoading(false); return }
+
+      // Rankings por seller
+      const sellerMap = new Map<string, RankingItem>()
+      const oficinaMap = new Map<string, RankingItem>()
+
+      for (const t of data as any[]) {
+        // Seller
+        const sn = t.merchant_name || 'Sem seller'
+        if (!sellerMap.has(sn)) sellerMap.set(sn, { name: sn, total: 0, abertos: 0, encerrados: 0, recusados: 0 })
+        const s = sellerMap.get(sn)!
+        s.total++
+        if (t.status === 'encerrado') s.encerrados++
+        else if (t.status === 'recusado') s.recusados++
+        else s.abertos++
+
+        // Oficina
+        const on = t.company_name || 'Sem cliente'
+        if (!oficinaMap.has(on)) oficinaMap.set(on, { name: on, total: 0, abertos: 0, encerrados: 0, recusados: 0 })
+        const o = oficinaMap.get(on)!
+        o.total++
+        if (t.status === 'encerrado') o.encerrados++
+        else if (t.status === 'recusado') o.recusados++
+        else o.abertos++
+      }
+
+      setSellers(Array.from(sellerMap.values()).sort((a, b) => b.total - a.total).slice(0, 10))
+      setOficinas(Array.from(oficinaMap.values()).sort((a, b) => b.total - a.total).slice(0, 10))
+      setLoading(false)
+    }
+    load()
+  }, [period])
+
+  return { sellers, oficinas, loading }
+}
+
+function RankingTable({ items, label }: { items: RankingItem[], label: string }) {
+  if (items.length === 0) return (
+    <p className="text-sm text-gray-400 text-center py-6">Nenhum dado no período</p>
+  )
+  return (
+    <table className="w-full text-sm">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">#</th>
+          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">{label}</th>
+          <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Total</th>
+          <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Abertos</th>
+          <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">Encerrados</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-50">
+        {items.map((item, i) => (
+          <tr key={item.name} className="hover:bg-gray-50">
+            <td className="px-4 py-2.5">
+              <span className={`font-bold text-xs ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-orange-400' : 'text-gray-300'}`}>
+                {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}º`}
+              </span>
+            </td>
+            <td className="px-4 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">{item.name}</td>
+            <td className="px-4 py-2.5 text-right font-bold text-gray-900">{item.total}</td>
+            <td className="px-4 py-2.5 text-right">
+              {item.abertos > 0
+                ? <span className="badge bg-amber-100 text-amber-700">{item.abertos}</span>
+                : <span className="text-gray-300">—</span>}
+            </td>
+            <td className="px-4 py-2.5 text-right">
+              {item.encerrados > 0
+                ? <span className="badge bg-green-100 text-green-700">{item.encerrados}</span>
+                : <span className="text-gray-300">—</span>}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 export default function MetricasPage() {
   const [period, setPeriod] = useState(30)
   const { summary, loading } = useMetrics(period)
+  const { sellers: rankingSellers, oficinas: rankingOficinas, loading: loadingRanking } = useRankings(period)
 
   return (
     <div className="space-y-6">
@@ -210,6 +311,30 @@ export default function MetricasPage() {
               </div>
             </div>
           )}
+
+          {/* Rankings */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+                <Trophy size={16} className="text-amber-500" />
+                <h2 className="font-semibold text-gray-800">Sellers com mais devoluções</h2>
+                <span className="text-xs text-gray-400 ml-auto">Top 10 · {period} dias</span>
+              </div>
+              {loadingRanking
+                ? <div className="flex justify-center py-8"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
+                : <RankingTable items={rankingSellers} label="Seller" />}
+            </div>
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+                <Trophy size={16} className="text-amber-500" />
+                <h2 className="font-semibold text-gray-800">Oficinas com mais devoluções</h2>
+                <span className="text-xs text-gray-400 ml-auto">Top 10 · {period} dias</span>
+              </div>
+              {loadingRanking
+                ? <div className="flex justify-center py-8"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
+                : <RankingTable items={rankingOficinas} label="Oficina" />}
+            </div>
+          </div>
 
           {summary.total_tickets === 0 && (
             <div className="card p-12 text-center text-gray-400 space-y-2">
