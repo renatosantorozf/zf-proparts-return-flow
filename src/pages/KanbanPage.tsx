@@ -149,11 +149,44 @@ export default function KanbanPage() {
   const navigate = useNavigate()
   const { tickets, loading, refetch } = useTickets()
   const { getSlaInfo } = useSla()
-  const [filtroSemAtividade, setFiltroSemAtividade] = useState(false)
+  // Filtros persistidos em localStorage — sobrevivem à navegação
+  const [filtroSemAtividade, setFiltroSemAtividadeRaw] = useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('kanban_filtro_atividade') ?? 'false') } catch { return false }
+  })
   const [ticketsSemAtividadeHoje, setTicketsSemAtividadeHoje] = useState<Set<string>>(new Set())
-  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'devolucao' | 'garantia'>('todos')
-  const [filtroSla, setFiltroSla] = useState(false)
-  const [busca, setBusca] = useState('')
+  const [filtroTipo, setFiltroTipoRaw] = useState<'todos' | 'devolucao' | 'garantia'>(() => {
+    try { return (localStorage.getItem('kanban_filtro_tipo') as 'todos' | 'devolucao' | 'garantia') ?? 'todos' } catch { return 'todos' }
+  })
+  const [filtroSla, setFiltroSlaRaw] = useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('kanban_filtro_sla') ?? 'false') } catch { return false }
+  })
+  const [busca, setBuscaRaw] = useState<string>(() => {
+    try { return localStorage.getItem('kanban_busca') ?? '' } catch { return '' }
+  })
+
+  // Wrappers que persistem ao setar
+  function setFiltroSemAtividade(v: boolean | ((prev: boolean) => boolean)) {
+    setFiltroSemAtividadeRaw(prev => {
+      const next = typeof v === 'function' ? v(prev) : v
+      try { localStorage.setItem('kanban_filtro_atividade', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+  function setFiltroTipo(v: 'todos' | 'devolucao' | 'garantia') {
+    setFiltroTipoRaw(v)
+    try { localStorage.setItem('kanban_filtro_tipo', v) } catch {}
+  }
+  function setFiltroSla(v: boolean | ((prev: boolean) => boolean)) {
+    setFiltroSlaRaw(prev => {
+      const next = typeof v === 'function' ? v(prev) : v
+      try { localStorage.setItem('kanban_filtro_sla', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+  function setBusca(v: string) {
+    setBuscaRaw(v)
+    try { localStorage.setItem('kanban_busca', v) } catch {}
+  }
 
   // Busca tickets ativos que tiveram log hoje
   useEffect(() => {
