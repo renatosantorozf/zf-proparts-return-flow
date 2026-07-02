@@ -1,6 +1,6 @@
 # ReturnFlow — ZF [pro]Parts
 
-Módulo interno de gestão de devoluções e garantias para o marketplace ZF [pro]Parts.
+Módulo interno de gestão de devoluções e garantias para o marketplace ZF [pro]Parts. 
 
 ## Stack
 
