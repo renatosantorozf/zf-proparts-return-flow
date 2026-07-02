@@ -5,7 +5,7 @@ Módulo interno de gestão de devoluções e garantias para o marketplace ZF [pr
 ## Stack
 
 - **Frontend:** React + Vite + TypeScript + Tailwind CSS
-- **Backend / BaaS:** Supabase (Auth + PostgreSQL + Storage)
+- **Backend / BaaS:** Supabase (Auth + PostgreSQL + Storage) 
 - **Hospedagem:** Cloudflare Workers (Static Assets)
 - **Sync SharePoint:** Cloudflare Worker separado — `workers/sync-orders` (PAD-03)
 
