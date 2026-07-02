@@ -365,7 +365,13 @@ export default function KanbanPage() {
       ) : (
         /* Colunas do Kanban — scroll horizontal */
         <div className="flex gap-3 overflow-x-auto pb-4">
-          {KANBAN_COLUMNS.map(status => (
+          {KANBAN_COLUMNS
+          .filter(status => {
+            // Quando filtro sem atividade ativo, oculta encerrado e recusado
+            if (filtroSemAtividade && (status === 'encerrado' || status === 'recusado')) return false
+            return true
+          })
+          .map(status => (
             <KanbanColumn
               key={status}
               status={status}
