@@ -194,8 +194,9 @@ export default function KanbanPage() {
       const hoje = new Date()
       const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString()
 
+      const STATUS_FINAIS = ['encerrado', 'recusado']
       const idsAtivos = tickets
-        .filter(t => COLUNAS_ATIVAS.includes(t.status as TicketStatus))
+        .filter(t => COLUNAS_ATIVAS.includes(t.status as TicketStatus) && !STATUS_FINAIS.includes(t.status))
         .map(t => t.id)
 
       if (idsAtivos.length === 0) { setTicketsSemAtividadeHoje(new Set()); return }
