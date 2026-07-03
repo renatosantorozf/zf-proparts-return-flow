@@ -227,8 +227,10 @@ export default function PlaybookPage() {
   const incompletos = sellers.filter(isIncomplete)
 
   const filtered = sellers.filter(s => {
+    const nf = ((s as any).nome_fantasia ?? '').toLowerCase()
     const matchSearch = s.merchant_name.toLowerCase().includes(search.toLowerCase()) ||
-      s.merchant_reference.toLowerCase().includes(search.toLowerCase())
+      s.merchant_reference.toLowerCase().includes(search.toLowerCase()) ||
+      nf.includes(search.toLowerCase())
     const matchFilter = filter === 'todos' || isIncomplete(s)
     return matchSearch && matchFilter
   })
