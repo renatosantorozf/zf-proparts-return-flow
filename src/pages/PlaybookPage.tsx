@@ -23,7 +23,11 @@ function SellerCard({ seller, onEdit }: { seller: Seller; onEdit: () => void }) 
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-gray-900">{seller.merchant_name}</h3>
+            <h3 className="font-bold text-gray-900">
+              {(seller as any).nome_fantasia
+                ? <>{(seller as any).nome_fantasia} <span className="text-gray-400 font-normal text-sm">· {seller.merchant_name}</span></>
+                : seller.merchant_name}
+            </h3>
             {incomplete && (
               <span className="badge bg-amber-100 text-amber-700 text-xs flex items-center gap-1">
                 <AlertCircle size={10} /> Completar
@@ -98,6 +102,7 @@ function SellerForm({ seller, onSave, onCancel }: {
   onCancel: () => void
 }) {
   const [form, setForm] = useState<Record<string, string>>({
+    nome_fantasia: (seller as any).nome_fantasia ?? '',
     canal_preferencial: seller.canal_preferencial ?? 'ambos',
     contato_nome: seller.contato_nome ?? '',
     contato_email: seller.contato_email ?? '',
@@ -130,6 +135,17 @@ function SellerForm({ seller, onSave, onCancel }: {
       <div>
         <h2 className="font-bold text-gray-900 text-lg">{seller.merchant_name}</h2>
         <p className="text-sm text-gray-500 mt-0.5">#{seller.merchant_reference}</p>
+      </div>
+
+      {/* Nome Fantasia */}
+      <div>
+        <label className={lc}>Nome Fantasia <span className="text-gray-400 font-normal">(opcional)</span></label>
+        <input
+          value={form.nome_fantasia ?? ''}
+          onChange={e => set('nome_fantasia', e.target.value)}
+          className="input"
+          placeholder="Ex: SKY Automotive, Compel Pecas..."
+        />
       </div>
 
       {/* Canal */}
