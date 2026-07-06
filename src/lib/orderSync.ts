@@ -47,7 +47,7 @@ export function parseOrderXlsx(buffer: ArrayBuffer): ParseResult {
     const itemSku = row[COL.item_sku]
     if (!orderId || !itemSku) { skippedRows++; continue }
 
-    const key = `${orderId}__${itemSku}__${s(row[COL.item_state])}__${n(row[COL.item_discount_value])}`
+    const key = `${orderId}__${itemSku}__${s(row[COL.item_state])}__${n(row[COL.item_discount_value])}__${i}`
     try {
       const record: Record<string, unknown> = {
         id_sales_order: s(orderId),
