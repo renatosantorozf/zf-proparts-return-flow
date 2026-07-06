@@ -95,12 +95,14 @@ export async function addLog(
   ticketId: string,
   tipo: string,
   mensagem: string,
-  userId?: string
+  userId?: string,
+  userEmail?: string
 ): Promise<void> {
   await db.from('ticket_logs').insert({
     ticket_id: ticketId,
     tipo,
     mensagem,
     created_by: userId ?? null,
+    created_by_email: userEmail ?? null,
   })
 }
