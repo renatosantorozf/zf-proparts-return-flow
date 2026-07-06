@@ -148,7 +148,7 @@ export default function TicketPage() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><p className="text-xs text-gray-400">Empresa</p><p className="font-medium">{ticket.company_name}</p></div>
               <div><p className="text-xs text-gray-400">CNPJ</p><p className="font-medium">{formatarCNPJ(ticket.company_cnpj ?? '')}</p></div>
-              <div><p className="text-xs text-gray-400">Seller</p><p className="font-medium">{ticket.merchant_name}</p></div>
+              <div><p className="text-xs text-gray-400">Seller</p><p className="font-medium">{(seller as any)?.nome_fantasia ? <>{(seller as any).nome_fantasia} <span className="text-gray-400 font-normal text-sm">· {ticket.merchant_name}</span></> : ticket.merchant_name}</p></div>
               <div><p className="text-xs text-gray-400">Loja nº</p><p className="font-medium">{ticket.merchant_reference || '—'}</p></div>
               <div className="col-span-2"><p className="text-xs text-gray-400">Motivo</p><p className="font-medium">{ticket.motivo}</p></div>
             </div>
@@ -173,7 +173,7 @@ export default function TicketPage() {
           {/* Playbook do seller */}
           {seller && (seller.instrucoes || seller.url_formulario) && (
             <div className="card p-5 space-y-3 border-l-4 border-zf-blue">
-              <h2 className="font-semibold text-gray-800 text-sm">📋 Processo — {seller.merchant_name}</h2>
+              <h2 className="font-semibold text-gray-800 text-sm">📋 Processo — {(seller as any)?.nome_fantasia || seller.merchant_name}</h2>
               {seller.instrucoes && (
                 <div className="bg-blue-50 rounded-lg p-3">
                   <p className="text-sm text-blue-900 whitespace-pre-wrap">{seller.instrucoes}</p>
@@ -274,6 +274,9 @@ export default function TicketPage() {
         <div className="space-y-4">
           <div className="card p-4 space-y-3">
             <h3 className="font-semibold text-gray-800 text-sm">Comunicar com Seller</h3>
+            {(seller as any)?.nome_fantasia && (
+              <p className="text-xs font-medium text-zf-blue">{(seller as any).nome_fantasia} <span className="text-gray-400 font-normal">· {seller?.merchant_name}</span></p>
+            )}
             {seller?.contato_nome && (
               <p className="text-xs text-gray-600 font-medium">{seller.contato_nome}</p>
             )}
