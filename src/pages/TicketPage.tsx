@@ -33,7 +33,7 @@ export default function TicketPage() {
   async function handleAddLog() {
     if (!logText.trim() || !id) return
     setSavingLog(true)
-    await addLog(id, logTipo, logText.trim(), user?.id)
+    await addLog(id, logTipo, logText.trim(), user?.id, user?.email ?? undefined)
     setLogText('')
     setSavingLog(false)
     refetch()
@@ -86,7 +86,7 @@ export default function TicketPage() {
       ? `https://wa.me/55${tel}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`
     window.open(url, '_blank')
-    if (id) addLog(id, 'whatsapp', `Comunicação gerada via WhatsApp${tel ? ` para ${seller?.contato_nome || tel}` : ''}`, user?.id).then(refetch)
+    if (id) addLog(id, 'whatsapp', `Comunicação gerada via WhatsApp${tel ? ` para ${seller?.contato_nome || tel}` : ''}`, user?.id, user?.email ?? undefined).then(refetch)
     setShowMsgModal(false)
   }
 
@@ -98,7 +98,7 @@ export default function TicketPage() {
     // Usa .eml para garantir encoding UTF-8 correto no Outlook
     abrirEmailOutlook({ to: email, subject, body: msg })
 
-    if (id) addLog(id, 'email', `Comunicação gerada via E-mail${email ? ` para ${email}` : ''}`, user?.id).then(refetch)
+    if (id) addLog(id, 'email', `Comunicação gerada via E-mail${email ? ` para ${email}` : ''}`, user?.id, user?.email ?? undefined).then(refetch)
     setShowMsgModal(false)
   }
 
@@ -139,8 +139,8 @@ export default function TicketPage() {
         <span className="badge bg-gray-100 text-gray-600">{STATUS_LABELS[ticket.status as TicketStatus]}</span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-        <div className="lg:col-span-3 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 space-y-4">
 
           {/* Dados do pedido */}
           <div className="card p-5 space-y-4">
@@ -230,6 +230,63 @@ export default function TicketPage() {
             </div>
           )}
 
+          {/* Histórico */}
+          <div className="card p-5 space-y-4">
+            <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+              <MessageSquare size={16} /> Histórico
+            </h2>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {logs.length === 0
+                ? <p className="text-sm text-gray-400">Nenhuma atualização registrada.</p>
+                : logs.map(log => (
+                  <div key={log.id} className="flex gap-3 text-sm border-b border-gray-50 pb-3 last:border-0 last:pb-0">
+                    <div className="flex flex-col items-center gap-1 shrink-0">
+                      <span className={`w-2 h-2 rounded-full mt-1 ${
+                        log.tipo === 'sistema' ? 'bg-gray-300' :
+                        log.tipo === 'whatsapp' ? 'bg-green-500' :
+                        log.tipo === 'email' ? 'bg-blue-500' :
+                        log.tipo === 'ligacao' ? 'bg-purple-500' :
+                        'bg-gray-400'
+                      }`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <span className={`text-xs font-medium ${
+                          log.tipo === 'sistema' ? 'text-gray-400' :
+                          log.tipo === 'whatsapp' ? 'text-green-700' :
+                          log.tipo === 'email' ? 'text-blue-700' :
+                          'text-gray-600'
+                        }`}>{log.tipo}</span>
+                        <span className="text-xs text-gray-400 shrink-0">{formatarDataHora(log.created_at)}</span>
+                      </div>
+                      <p className="text-gray-800 leading-snug">{log.mensagem}</p>
+                      {(log as any).created_by_email && log.tipo !== 'sistema' && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          por {(log as any).created_by_email.split('@')[0]}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+            <div className="border-t border-gray-100 pt-4 space-y-2">
+              <select value={logTipo} onChange={e => setLogTipo(e.target.value as LogTipo)}
+                className="input w-36 text-sm">
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">E-mail</option>
+                <option value="ligacao">Ligação</option>
+                <option value="outro">Outro</option>
+              </select>
+              <textarea value={logText} onChange={e => setLogText(e.target.value)}
+                placeholder="Registrar atualização..." className="input resize-none text-sm" rows={3} />
+              <button onClick={handleAddLog} disabled={!logText.trim() || savingLog}
+                className="btn-primary text-sm">
+                {savingLog ? 'Salvando...' : 'Registrar'}
+              </button>
+            </div>
+          </div>
+
           {/* Anexos */}
           <TicketAttachments ticketId={ticket.id} />
 
@@ -294,49 +351,6 @@ export default function TicketPage() {
                     → {STATUS_LABELS[s]}
                   </button>
                 ))}
-            </div>
-          </div>
-
-          {/* Histórico na sidebar */}
-          <div className="card p-4 space-y-3 lg:col-span-2">
-            <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
-              <MessageSquare size={14} /> Histórico
-            </h3>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {logs.length === 0
-                ? <p className="text-xs text-gray-400">Nenhuma atualização.</p>
-                : logs.map(log => (
-                  <div key={log.id} className="flex gap-2 text-xs">
-                    <span className={`shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full mt-1.5 ${
-                      log.tipo === 'sistema' ? 'bg-gray-300' :
-                      log.tipo === 'whatsapp' ? 'bg-green-500' :
-                      log.tipo === 'email' ? 'bg-blue-500' :
-                      'bg-gray-400'
-                    }`} title={log.tipo} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-gray-700 leading-snug">{log.mensagem}</p>
-                      <p className="text-gray-400 mt-0.5">{formatarDataHora(log.created_at)}</p>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-            <div className="border-t border-gray-100 pt-3 space-y-2">
-              <div className="flex gap-2">
-                <select value={logTipo} onChange={e => setLogTipo(e.target.value as LogTipo)}
-                  className="input text-xs py-1.5 flex-1">
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="email">E-mail</option>
-                  <option value="ligacao">Ligação</option>
-                  <option value="outro">Outro</option>
-                </select>
-              </div>
-              <textarea value={logText} onChange={e => setLogText(e.target.value)}
-                placeholder="Registrar atualização..." className="input resize-none text-xs" rows={2} />
-              <button onClick={handleAddLog} disabled={!logText.trim() || savingLog}
-                className="btn-primary text-xs w-full">
-                {savingLog ? 'Salvando...' : 'Registrar'}
-              </button>
             </div>
           </div>
 
