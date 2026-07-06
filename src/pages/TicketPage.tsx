@@ -139,8 +139,8 @@ export default function TicketPage() {
         <span className="badge bg-gray-100 text-gray-600">{STATUS_LABELS[ticket.status as TicketStatus]}</span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+        <div className="lg:col-span-3 space-y-4">
 
           {/* Dados do pedido */}
           <div className="card p-5 space-y-4">
@@ -233,41 +233,6 @@ export default function TicketPage() {
           {/* Anexos */}
           <TicketAttachments ticketId={ticket.id} />
 
-          {/* Log */}
-          <div className="card p-5 space-y-4">
-            <h2 className="font-semibold text-gray-800 flex items-center gap-2"><MessageSquare size={16} /> Histórico</h2>
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {logs.length === 0 ? <p className="text-sm text-gray-400">Nenhuma atualização registrada.</p> : (
-                logs.map(log => (
-                  <div key={log.id} className="flex gap-3 text-sm">
-                    <span className={`badge text-xs shrink-0 mt-0.5 ${
-                      log.tipo === 'sistema' ? 'bg-gray-100 text-gray-500' :
-                      log.tipo === 'whatsapp' ? 'bg-green-100 text-green-700' :
-                      log.tipo === 'email' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>{log.tipo}</span>
-                    <div className="flex-1">
-                      <p className="text-gray-800">{log.mensagem}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{formatarDataHora(log.created_at)}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="border-t border-gray-100 pt-4 space-y-2">
-              <select value={logTipo} onChange={e => setLogTipo(e.target.value as LogTipo)} className="input w-36 text-sm">
-                <option value="whatsapp">WhatsApp</option>
-                <option value="email">E-mail</option>
-                <option value="ligacao">Ligação</option>
-                <option value="outro">Outro</option>
-              </select>
-              <textarea value={logText} onChange={e => setLogText(e.target.value)}
-                placeholder="Registrar atualização..." className="input resize-none text-sm" rows={2} />
-              <button onClick={handleAddLog} disabled={!logText.trim() || savingLog} className="btn-primary text-sm">
-                {savingLog ? 'Salvando...' : 'Registrar'}
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Sidebar */}
@@ -329,6 +294,49 @@ export default function TicketPage() {
                     → {STATUS_LABELS[s]}
                   </button>
                 ))}
+            </div>
+          </div>
+
+          {/* Histórico na sidebar */}
+          <div className="card p-4 space-y-3 lg:col-span-2">
+            <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+              <MessageSquare size={14} /> Histórico
+            </h3>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {logs.length === 0
+                ? <p className="text-xs text-gray-400">Nenhuma atualização.</p>
+                : logs.map(log => (
+                  <div key={log.id} className="flex gap-2 text-xs">
+                    <span className={`shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full mt-1.5 ${
+                      log.tipo === 'sistema' ? 'bg-gray-300' :
+                      log.tipo === 'whatsapp' ? 'bg-green-500' :
+                      log.tipo === 'email' ? 'bg-blue-500' :
+                      'bg-gray-400'
+                    }`} title={log.tipo} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-gray-700 leading-snug">{log.mensagem}</p>
+                      <p className="text-gray-400 mt-0.5">{formatarDataHora(log.created_at)}</p>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+            <div className="border-t border-gray-100 pt-3 space-y-2">
+              <div className="flex gap-2">
+                <select value={logTipo} onChange={e => setLogTipo(e.target.value as LogTipo)}
+                  className="input text-xs py-1.5 flex-1">
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="email">E-mail</option>
+                  <option value="ligacao">Ligação</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </div>
+              <textarea value={logText} onChange={e => setLogText(e.target.value)}
+                placeholder="Registrar atualização..." className="input resize-none text-xs" rows={2} />
+              <button onClick={handleAddLog} disabled={!logText.trim() || savingLog}
+                className="btn-primary text-xs w-full">
+                {savingLog ? 'Salvando...' : 'Registrar'}
+              </button>
             </div>
           </div>
 
