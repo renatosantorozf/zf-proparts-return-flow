@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, AlertTriangle, RefreshCw, Search, X } from 'lucide-react'
 import { useTickets, updateTicketStatus } from '@/hooks/useTickets'
 import { db } from '@/lib/db'
+import { db } from '@/lib/db'
 import { useSla } from '@/hooks/useSla'
 import { calcularDiasUteis } from '@/lib/dateUtils'
 import { formatarMoeda } from '@/lib/formatters'
@@ -78,6 +79,18 @@ function KanbanCard({ ticket, getSlaInfo, onClick }: {
       {ticket.mei_status === 'nao_mei' && (
         <span className="badge bg-yellow-50 text-yellow-600 text-xs">NFD obrigatória</span>
       )}
+
+      {ultimoLog && (
+        <div className="border-t border-gray-100 pt-2 mt-1">
+          <p className="text-xs text-gray-500 truncate italic">"{ultimoLog.mensagem}"</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {ultimoLog.created_by_email
+              ? ultimoLog.created_by_email.split('@')[0]
+              : ultimoLog.tipo}
+            {' · '}{new Date(ultimoLog.created_at).toLocaleDateString('pt-BR')}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -140,6 +153,39 @@ function KanbanColumn({ status, tickets, getSlaInfo, onCardClick, onDrop }: {
   )
 }
 
+interface UltimoLog {
+  ticket_id: string
+  mensagem: string
+  tipo: string
+  created_at: string
+  created_by_email?: string
+}
+
+function useUltimosLogs(ticketIds: string[]) {
+  const [logs, setLogs] = useState<Map<string, UltimoLog>>(new Map())
+
+  useEffect(() => {
+    if (ticketIds.length === 0) { setLogs(new Map()); return }
+    async function load() {
+      const { data } = await db
+        .from('ticket_logs')
+        .select('ticket_id, mensagem, tipo, created_at, created_by_email')
+        .in('ticket_id', ticketIds)
+        .neq('tipo', 'sistema')
+        .order('created_at', { ascending: false })
+
+      const map = new Map<string, UltimoLog>()
+      for (const log of (data ?? []) as UltimoLog[]) {
+        if (!map.has(log.ticket_id)) map.set(log.ticket_id, log)
+      }
+      setLogs(map)
+    }
+    load()
+  }, [ticketIds.join(',')])
+
+  return logs
+}
+
 const COLUNAS_ATIVAS: TicketStatus[] = [
   'aberto', 'contato_enviado', 'aguardando_autorizacao',
   'autorizado', 'nfd_pendente', 'logistica_reversa_concluida'
@@ -149,6 +195,10 @@ export default function KanbanPage() {
   const navigate = useNavigate()
   const { tickets, loading, refetch } = useTickets()
   const { getSlaInfo } = useSla()
+  const idsAtivosParaLog = tickets
+    .filter(t => !['encerrado', 'recusado'].includes(t.status))
+    .map(t => t.id)
+  const ultimosLogs = useUltimosLogs(idsAtivosParaLog)
   // Filtros persistidos em localStorage — sobrevivem à navegação
   const [filtroInatividade, setFiltroInatividadeRaw] = useState<'off' | 'hoje' | '1d' | '2d'>(() => {
     try { return (localStorage.getItem('kanban_filtro_atividade') as 'off' | 'hoje' | '1d' | '2d') ?? 'off' } catch { return 'off' }
