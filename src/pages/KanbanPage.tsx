@@ -150,8 +150,8 @@ export default function KanbanPage() {
   const { tickets, loading, refetch } = useTickets()
   const { getSlaInfo } = useSla()
   // Filtros persistidos em localStorage — sobrevivem à navegação
-  const [filtroSemAtividade, setFiltroSemAtividadeRaw] = useState<boolean>(() => {
-    try { return JSON.parse(localStorage.getItem('kanban_filtro_atividade') ?? 'false') } catch { return false }
+  const [filtroInatividade, setFiltroInatividadeRaw] = useState<'off' | 'hoje' | '1d' | '2d'>(() => {
+    try { return (localStorage.getItem('kanban_filtro_atividade') as 'off' | 'hoje' | '1d' | '2d') ?? 'off' } catch { return 'off' }
   })
   const [ticketsSemAtividadeHoje, setTicketsSemAtividadeHoje] = useState<Set<string>>(new Set())
   const [filtroTipo, setFiltroTipoRaw] = useState<'todos' | 'devolucao' | 'garantia'>(() => {
@@ -165,12 +165,9 @@ export default function KanbanPage() {
   })
 
   // Wrappers que persistem ao setar
-  function setFiltroSemAtividade(v: boolean | ((prev: boolean) => boolean)) {
-    setFiltroSemAtividadeRaw(prev => {
-      const next = typeof v === 'function' ? v(prev) : v
-      try { localStorage.setItem('kanban_filtro_atividade', JSON.stringify(next)) } catch {}
-      return next
-    })
+  function setFiltroInatividade(v: 'off' | 'hoje' | '1d' | '2d') {
+    setFiltroInatividadeRaw(v)
+    try { localStorage.setItem('kanban_filtro_atividade', v) } catch {}
   }
   function setFiltroTipo(v: 'todos' | 'devolucao' | 'garantia') {
     setFiltroTipoRaw(v)
@@ -188,11 +185,20 @@ export default function KanbanPage() {
     try { localStorage.setItem('kanban_busca', v) } catch {}
   }
 
-  // Busca tickets ativos que tiveram log hoje
+  // Busca tickets ativos sem atividade no periodo selecionado
   useEffect(() => {
     async function loadAtividade() {
-      const hoje = new Date()
-      const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString()
+      if (filtroInatividade === 'off') { setTicketsSemAtividadeHoje(new Set()); return }
+
+      const agora = new Date()
+      let desde: Date
+      if (filtroInatividade === 'hoje') {
+        desde = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate())
+      } else if (filtroInatividade === '1d') {
+        desde = new Date(agora.getTime() - 24 * 60 * 60 * 1000)
+      } else {
+        desde = new Date(agora.getTime() - 48 * 60 * 60 * 1000)
+      }
 
       const STATUS_FINAIS = ['encerrado', 'recusado']
       const idsAtivos = tickets
@@ -201,18 +207,18 @@ export default function KanbanPage() {
 
       if (idsAtivos.length === 0) { setTicketsSemAtividadeHoje(new Set()); return }
 
-      const { data: logsHoje } = await db
+      const { data: logsRecentes } = await db
         .from('ticket_logs')
         .select('ticket_id')
         .in('ticket_id', idsAtivos)
-        .gte('created_at', inicioHoje)
+        .gte('created_at', desde.toISOString())
 
-      const comAtividade = new Set(((logsHoje ?? []) as { ticket_id: string }[]).map(l => l.ticket_id))
+      const comAtividade = new Set(((logsRecentes ?? []) as { ticket_id: string }[]).map(l => l.ticket_id))
       const semAtividade = new Set(idsAtivos.filter(id => !comAtividade.has(id)))
       setTicketsSemAtividadeHoje(semAtividade)
     }
     if (!loading) loadAtividade()
-  }, [tickets, loading])
+  }, [tickets, loading, filtroInatividade])
 
   const criticalTotal = tickets.filter(t =>
     !['encerrado', 'recusado'].includes(t.status) &&
@@ -234,8 +240,8 @@ export default function KanbanPage() {
   const columnTickets = (status: TicketStatus) => {
     let base = tickets.filter(t => t.status === status)
 
-    // Filtro sem atividade hoje (apenas colunas ativas)
-    if (filtroSemAtividade && COLUNAS_ATIVAS.includes(status)) {
+    // Filtro por inatividade (apenas colunas ativas)
+    if (filtroInatividade !== 'off' && COLUNAS_ATIVAS.includes(status)) {
       base = base.filter(t => ticketsSemAtividadeHoje.has(t.id))
     }
     // Filtro por tipo
@@ -312,15 +318,26 @@ export default function KanbanPage() {
             <AlertTriangle size={11} /> SLA estourado
           </button>
 
-          {/* Sem atividade */}
-          <button onClick={() => setFiltroSemAtividade(f => !f)}
-            className={'text-xs px-2.5 py-1.5 rounded-lg border transition-colors ' +
-              (filtroSemAtividade ? 'border-amber-400 bg-amber-50 text-amber-700 font-medium' : 'border-gray-200 text-gray-600 hover:border-gray-300')}>
-            Sem atividade hoje
-            {filtroSemAtividade && ticketsSemAtividadeHoje.size > 0 && (
-              <span className="ml-1 font-bold">({ticketsSemAtividadeHoje.size})</span>
-            )}
-          </button>
+          {/* Inatividade */}
+          <div className="flex gap-1">
+            {([
+              { key: 'hoje', label: 'Hoje' },
+              { key: '1d',   label: '+1 dia' },
+              { key: '2d',   label: '+2 dias' },
+            ] as const).map(({ key, label }) => (
+              <button key={key}
+                onClick={() => setFiltroInatividade(filtroInatividade === key ? 'off' : key)}
+                className={'text-xs px-2.5 py-1.5 rounded-lg border transition-colors ' +
+                  (filtroInatividade === key
+                    ? 'border-amber-400 bg-amber-50 text-amber-700 font-medium'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300')}>
+                {label}
+                {filtroInatividade === key && ticketsSemAtividadeHoje.size > 0 && (
+                  <span className="ml-1 font-bold">({ticketsSemAtividadeHoje.size})</span>
+                )}
+              </button>
+            ))}
+          </div>
 
           <div className="w-px h-5 bg-gray-200" />
 
@@ -342,7 +359,7 @@ export default function KanbanPage() {
             <>
               <div className="w-px h-5 bg-gray-200" />
               <button
-                onClick={() => { setFiltroSemAtividade(false); setFiltroTipo('todos'); setFiltroSla(false); setBusca('') }}
+                onClick={() => { setFiltroInatividade('off'); setFiltroTipo('todos'); setFiltroSla(false); setBusca('') }}
                 className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1.5">
                 <X size={11} /> Limpar ({filtrosAtivos})
               </button>
