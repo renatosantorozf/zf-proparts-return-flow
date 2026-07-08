@@ -96,12 +96,13 @@ function KanbanCard({ ticket, getSlaInfo, onClick, ultimoLog }: {
   )
 }
 
-function KanbanColumn({ status, tickets, getSlaInfo, onCardClick, onDrop }: {
+function KanbanColumn({ status, tickets, getSlaInfo, onCardClick, onDrop, ultimosLogs }: {
   status: TicketStatus
   tickets: Ticket[]
   getSlaInfo: ReturnType<typeof useSla>['getSlaInfo']
   onCardClick: (id: string) => void
   onDrop: (ticketId: string, newStatus: TicketStatus) => void
+  ultimosLogs?: Map<string, { mensagem: string; tipo: string; created_at: string; created_by_email?: string }>
 }) {
   const [dragOver, setDragOver] = useState(false)
   const criticalCount = tickets.filter(t => getSlaInfo(t.status, t.created_at).status === 'critical').length
@@ -143,6 +144,7 @@ function KanbanColumn({ status, tickets, getSlaInfo, onCardClick, onDrop }: {
               ticket={ticket}
               getSlaInfo={getSlaInfo}
               onClick={() => onCardClick(ticket.id)}
+              ultimoLog={ultimosLogs?.get(ticket.id)}
             />
           </div>
         ))}
@@ -448,6 +450,7 @@ export default function KanbanPage() {
               getSlaInfo={getSlaInfo}
               onCardClick={id => navigate(`/tickets/${id}`)}
               onDrop={handleDrop}
+              ultimosLogs={ultimosLogs}
             />
           ))}
         </div>
