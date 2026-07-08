@@ -28,10 +28,11 @@ function AgingBadge({ createdAt, status, getSlaInfo }: {
   )
 }
 
-function KanbanCard({ ticket, getSlaInfo, onClick }: {
+function KanbanCard({ ticket, getSlaInfo, onClick, ultimoLog }: {
   ticket: Ticket
   getSlaInfo: ReturnType<typeof useSla>['getSlaInfo']
   onClick: () => void
+  ultimoLog?: { mensagem: string; tipo: string; created_at: string; created_by_email?: string }
 }) {
   const info = getSlaInfo(ticket.status, ticket.created_at)
   const borderColor = {
