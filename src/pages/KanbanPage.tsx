@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, AlertTriangle, RefreshCw, Search, X } from 'lucide-react'
 import { useTickets, updateTicketStatus } from '@/hooks/useTickets'
 import { db } from '@/lib/db'
-import { db } from '@/lib/db'
 import { useSla } from '@/hooks/useSla'
 import { calcularDiasUteis } from '@/lib/dateUtils'
 import { formatarMoeda } from '@/lib/formatters'
@@ -14,6 +13,7 @@ function AgingBadge({ createdAt, status, getSlaInfo }: {
   createdAt: string
   status: TicketStatus
   getSlaInfo: ReturnType<typeof useSla>['getSlaInfo']
+  ultimoLog?: UltimoLog
 }) {
   const info = getSlaInfo(status, createdAt)
   const colorMap = {
@@ -282,7 +282,7 @@ export default function KanbanPage() {
     refetch()
   }
 
-  const filtrosAtivos = (filtroSemAtividade ? 1 : 0) +
+  const filtrosAtivos = (filtroInatividade !== 'off' ? 1 : 0) +
     (filtroTipo !== 'todos' ? 1 : 0) +
     (filtroSla ? 1 : 0) +
     (busca.trim() ? 1 : 0)
@@ -436,7 +436,7 @@ export default function KanbanPage() {
           {KANBAN_COLUMNS
           .filter(status => {
             // Quando filtro sem atividade ativo, oculta encerrado e recusado
-            if (filtroSemAtividade && (status === 'encerrado' || status === 'recusado')) return false
+            if (filtroInatividade !== 'off' && (status === 'encerrado' || status === 'recusado')) return false
             return true
           })
           .map(status => (
