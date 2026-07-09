@@ -53,6 +53,8 @@ export interface Ticket {
   merchant_name?: string
   numero_nf?: string
   chave_xml_nf?: string
+  responsavel_id?: string
+  responsavel_email?: string
   mei_status?: MeiStatus
   devolucao_tipo: DevolucaoTipo
   valor_total_devolucao?: number
