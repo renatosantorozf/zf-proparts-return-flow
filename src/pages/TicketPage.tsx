@@ -31,12 +31,12 @@ export default function TicketPage() {
   useEffect(() => {
     if (!ticket?.merchant_reference) return
     getSellerByRef(ticket.merchant_reference).then(s => setSeller(s))
-    // Buscar usuarios que ja registraram logs para montar o dropdown
-    db.from('ticket_logs')
-      .select('created_by_email')
-      .not('created_by_email', 'is', null)
+    // Buscar usuarios da tabela system_users
+    db.from('system_users')
+      .select('email, nome')
+      .order('email')
       .then(({ data }) => {
-        const emails = [...new Set((data ?? []).map((l: any) => l.created_by_email).filter(Boolean))] as string[]
+        const emails = (data ?? []).map((u: any) => u.email).filter(Boolean) as string[]
         if (user?.email && !emails.includes(user.email)) emails.unshift(user.email)
         setUsuarios(emails)
       })
