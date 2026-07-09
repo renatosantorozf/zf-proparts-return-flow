@@ -81,6 +81,19 @@ function KanbanCard({ ticket, getSlaInfo, onClick, ultimoLog }: {
         <span className="badge bg-yellow-50 text-yellow-600 text-xs">NFD obrigatória</span>
       )}
 
+      <div className="flex items-center justify-between mt-1">
+        {(ticket as any).responsavel_email ? (
+          <span className="flex items-center gap-1 text-xs text-zf-blue font-medium">
+            <span className="w-4 h-4 rounded-full bg-zf-blue text-white flex items-center justify-center text-xs font-bold">
+              {(ticket as any).responsavel_email.split('@')[0].charAt(0).toUpperCase()}
+            </span>
+            {(ticket as any).responsavel_email.split('@')[0]}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-300">Sem responsável</span>
+        )}
+      </div>
+
       {ultimoLog && (
         <div className="border-t border-gray-100 pt-2 mt-1">
           <p className="text-xs text-gray-500 truncate italic">"{ultimoLog.mensagem}"</p>
@@ -216,6 +229,13 @@ export default function KanbanPage() {
   const [busca, setBuscaRaw] = useState<string>(() => {
     try { return localStorage.getItem('kanban_busca') ?? '' } catch { return '' }
   })
+  const [filtroResponsavel, setFiltroResponsavelRaw] = useState<string>(() => {
+    try { return localStorage.getItem('kanban_filtro_responsavel') ?? '' } catch { return '' }
+  })
+  function setFiltroResponsavel(v: string) {
+    setFiltroResponsavelRaw(v)
+    try { localStorage.setItem('kanban_filtro_responsavel', v) } catch {}
+  }
 
   // Wrappers que persistem ao setar
   function setFiltroInatividade(v: 'off' | 'hoje' | '1d' | '2d') {
@@ -288,7 +308,8 @@ export default function KanbanPage() {
   const filtrosAtivos = (filtroInatividade !== 'off' ? 1 : 0) +
     (filtroTipo !== 'todos' ? 1 : 0) +
     (filtroSla ? 1 : 0) +
-    (busca.trim() ? 1 : 0)
+    (busca.trim() ? 1 : 0) +
+    (filtroResponsavel ? 1 : 0)
 
   const columnTickets = (status: TicketStatus) => {
     let base = tickets.filter(t => t.status === status)
@@ -305,6 +326,15 @@ export default function KanbanPage() {
     if (filtroSla && COLUNAS_ATIVAS.includes(status)) {
       base = base.filter(t => getSlaInfo(t.status, t.created_at).status === 'critical')
     }
+    // Filtro por responsável
+    if (filtroResponsavel) {
+      if (filtroResponsavel === '__sem__') {
+        base = base.filter(t => !(t as any).responsavel_email)
+      } else {
+        base = base.filter(t => (t as any).responsavel_email === filtroResponsavel)
+      }
+    }
+
     // Busca unificada: seller, cliente ou pedido
     if (busca.trim()) {
       const q = busca.trim().toLowerCase()
@@ -407,12 +437,30 @@ export default function KanbanPage() {
             )}
           </div>
 
+          {/* Responsável */}
+          <select
+            value={filtroResponsavel}
+            onChange={e => setFiltroResponsavel(e.target.value)}
+            className={'border rounded-lg py-1.5 px-2 text-xs focus:outline-none focus:border-zf-blue ' +
+              (filtroResponsavel ? 'border-zf-blue bg-zf-blue-light text-zf-blue' : 'border-gray-200 text-gray-600')}
+          >
+            <option value="">Responsável...</option>
+            <option value="__sem__">Sem responsável</option>
+            {tickets
+              .map(t => (t as any).responsavel_email)
+              .filter((e, i, arr) => e && arr.indexOf(e) === i)
+              .map((email: string) => (
+                <option key={email} value={email}>{email.split('@')[0]}</option>
+              ))
+            }
+          </select>
+
           {/* Limpar tudo */}
           {filtrosAtivos > 0 && (
             <>
               <div className="w-px h-5 bg-gray-200" />
               <button
-                onClick={() => { setFiltroInatividade('off'); setFiltroTipo('todos'); setFiltroSla(false); setBusca('') }}
+                onClick={() => { setFiltroInatividade('off'); setFiltroTipo('todos'); setFiltroSla(false); setBusca(''); setFiltroResponsavel('') }}
                 className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1.5">
                 <X size={11} /> Limpar ({filtrosAtivos})
               </button>
