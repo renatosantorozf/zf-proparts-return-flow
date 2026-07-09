@@ -21,6 +21,8 @@ export default function TicketPage() {
   const [logText, setLogText] = useState('')
   const [logTipo, setLogTipo] = useState<LogTipo>('whatsapp')
   const [savingLog, setSavingLog] = useState(false)
+  const [savingResp, setSavingResp] = useState(false)
+  const [usuarios, setUsuarios] = useState<string[]>([])
   const [showMsgModal, setShowMsgModal] = useState(false)
   const [msgChannel, setMsgChannel] = useState<'whatsapp' | 'email'>('whatsapp')
   const [copied, setCopied] = useState(false)
@@ -28,7 +30,31 @@ export default function TicketPage() {
   useEffect(() => {
     if (!ticket?.merchant_reference) return
     getSellerByRef(ticket.merchant_reference).then(s => setSeller(s))
+    // Buscar usuarios que ja registraram logs para montar o dropdown
+    db.from('ticket_logs')
+      .select('created_by_email')
+      .not('created_by_email', 'is', null)
+      .then(({ data }) => {
+        const emails = [...new Set((data ?? []).map((l: any) => l.created_by_email).filter(Boolean))] as string[]
+        if (user?.email && !emails.includes(user.email)) emails.unshift(user.email)
+        setUsuarios(emails)
+      })
   }, [ticket?.merchant_reference])
+
+  async function handleSetResponsavel(email: string | null) {
+    setSavingResp(true)
+    await db.from('tickets').update({
+      responsavel_id: email ? user?.id : null,
+      responsavel_email: email,
+    }).eq('id', id)
+    if (email) {
+      await addLog(id, 'sistema', `Responsável definido: ${email.split('@')[0]}`, user?.id, user?.email ?? undefined)
+    } else {
+      await addLog(id, 'sistema', 'Responsável removido', user?.id, user?.email ?? undefined)
+    }
+    setSavingResp(false)
+    refetch()
+  }
 
   async function handleAddLog() {
     if (!logText.trim() || !id) return
@@ -352,6 +378,42 @@ export default function TicketPage() {
                   </button>
                 ))}
             </div>
+          </div>
+
+          {/* Responsável */}
+          <div className="card p-4 space-y-3">
+            <h3 className="font-semibold text-gray-800 text-sm">Responsável</h3>
+            {(ticket as any).responsavel_email ? (
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-zf-blue flex items-center justify-center text-white text-xs font-bold shrink-0">
+                    {(ticket as any).responsavel_email.split('@')[0].charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm text-gray-800">{(ticket as any).responsavel_email.split('@')[0]}</span>
+                </div>
+                <button
+                  onClick={() => handleSetResponsavel(null)}
+                  disabled={savingResp}
+                  className="text-xs text-red-400 hover:text-red-600"
+                >
+                  Remover
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">Sem responsável</p>
+            )}
+            <select
+              onChange={e => { if (e.target.value) handleSetResponsavel(e.target.value); e.target.value = '' }}
+              disabled={savingResp}
+              className="input text-xs py-1.5 w-full"
+              defaultValue=""
+            >
+              <option value="" disabled>{savingResp ? 'Salvando...' : (ticket as any).responsavel_email ? 'Trocar responsável...' : 'Alocar responsável...'}</option>
+              <option value={user?.email ?? ''}>{user?.email?.split('@')[0]} (eu)</option>
+              {usuarios.filter(e => e !== user?.email).map(email => (
+                <option key={email} value={email}>{email.split('@')[0]}</option>
+              ))}
+            </select>
           </div>
 
           <div className="card p-4 space-y-2 text-xs text-gray-500">
