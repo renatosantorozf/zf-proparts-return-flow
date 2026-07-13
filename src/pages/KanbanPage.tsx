@@ -204,7 +204,7 @@ function useUltimosLogs(ticketIds: string[]) {
 
 const COLUNAS_ATIVAS: TicketStatus[] = [
   'aberto', 'contato_enviado', 'aguardando_autorizacao',
-  'autorizado', 'nfd_pendente', 'logistica_reversa_concluida'
+  'autorizado', 'nfd_pendente', 'pronto_para_retirada', 'logistica_reversa_concluida'
 ]
 
 export default function KanbanPage() {
