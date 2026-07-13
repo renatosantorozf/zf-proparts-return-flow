@@ -150,6 +150,7 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   aguardando_autorizacao: 'Aguardando Autorização',
   autorizado: 'Autorizado',
   nfd_pendente: 'NFD Pendente',
+  pronto_para_retirada: 'Pronto para Retirada',
   logistica_reversa_concluida: 'Logistica Reversa Concluida',
   encerrado: 'Estorno Realizado',
   recusado: 'Recusado',
