@@ -4,6 +4,7 @@ export type TicketStatus =
   | 'aguardando_autorizacao'
   | 'autorizado'
   | 'nfd_pendente'
+  | 'pronto_para_retirada'
   | 'logistica_reversa_concluida'
   | 'encerrado'
   | 'recusado'
