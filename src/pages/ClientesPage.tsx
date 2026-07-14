@@ -13,6 +13,7 @@ interface TicketResumo {
   tipo: string
   status: TicketStatus
   merchant_name: string
+  merchant_nome_fantasia?: string
   motivo: string
   itens: { item_name: string; qtd_devolvida: number }[]
 }
@@ -30,7 +31,8 @@ function gerarMensagem(cliente: ClienteAgrupado): string {
 
   cliente.tickets.forEach((t, idx) => {
     msg += `\n${idx + 1}. *Pedido ${t.order_id}* — Ticket #${t.ticket_number}\n`
-    msg += `   Seller: ${t.merchant_name}\n`
+    const sellerLabel = t.merchant_nome_fantasia ? `${t.merchant_nome_fantasia} (${t.merchant_name})` : t.merchant_name
+    msg += `   Seller: ${sellerLabel}\n`
     if (t.itens.length > 0) {
       msg += `   Itens:\n`
       t.itens.forEach(i => {
@@ -140,7 +142,10 @@ function ClienteCard({ cliente }: { cliente: ClienteAgrupado }) {
                     </a>
                   </td>
                   <td className="px-5 py-2.5 font-mono text-xs text-gray-600">#{t.order_id}</td>
-                  <td className="px-5 py-2.5 text-xs text-gray-700 max-w-[120px] truncate">{t.merchant_name}</td>
+                  <td className="px-5 py-2.5 text-xs text-gray-700 max-w-[140px]">
+                    {t.merchant_nome_fantasia && <p className="font-medium text-gray-800 truncate">{t.merchant_nome_fantasia}</p>}
+                    <p className="text-gray-500 truncate">{t.merchant_name}</p>
+                  </td>
                   <td className="px-5 py-2.5 max-w-[200px]">
                     {t.itens.slice(0, 2).map((item, i) => (
                       <p key={i} className="text-xs text-gray-600 truncate">{item.item_name} ({item.qtd_devolvida})</p>
@@ -177,11 +182,22 @@ export default function ClientesPage() {
 
     const { data: tickets } = await db
       .from('tickets')
-      .select('id, ticket_number, order_id, tipo, status, merchant_name, motivo, company_name, company_cnpj')
+      .select('id, ticket_number, order_id, tipo, status, merchant_name, merchant_reference, motivo, company_name, company_cnpj')
       .not('status', 'in', `(${STATUS_EXCLUIDOS.map(s => `"${s}"`).join(',')})`)
       .order('company_name')
 
     if (!tickets || tickets.length === 0) { setLoading(false); return }
+
+    // Buscar nome_fantasia dos sellers
+    const refs = [...new Set((tickets as any[]).map((t: any) => t.merchant_reference).filter(Boolean))]
+    const { data: sellersData } = await db
+      .from('sellers')
+      .select('merchant_reference, nome_fantasia')
+      .in('merchant_reference', refs)
+    const sellerMap = new Map<string, string>()
+    for (const s of (sellersData ?? []) as any[]) {
+      if (s.nome_fantasia) sellerMap.set(s.merchant_reference, s.nome_fantasia)
+    }
 
     const ids = (tickets as any[]).map((t: any) => t.id)
     const { data: items } = await db
@@ -212,6 +228,7 @@ export default function ClientesPage() {
         tipo: t.tipo,
         status: t.status,
         merchant_name: t.merchant_name,
+        merchant_nome_fantasia: sellerMap.get(t.merchant_reference) ?? undefined,
         motivo: t.motivo,
         itens: itemsMap.get(t.id) ?? [],
       })
