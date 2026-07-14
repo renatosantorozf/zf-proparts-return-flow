@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Package, BookOpen, Settings, LogOut, RefreshCw, BarChart2, Building2 } from 'lucide-react'
+import { LayoutDashboard, Package, BookOpen, Settings, LogOut, RefreshCw, BarChart2, Building2, Users } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useSyncStatus } from '@/hooks/useSyncStatus'
 
@@ -12,6 +12,7 @@ export default function Layout() {
     { to: '/kanban',   icon: LayoutDashboard, label: 'Kanban' },
     { to: '/pedidos',  icon: Package,         label: 'Pedidos' },
     { to: '/oficinas', icon: Building2,       label: 'Oficinas' },
+    { to: '/clientes', icon: Users,           label: 'Clientes' },
     { to: '/playbook', icon: BookOpen,        label: 'Sellers' },
     { to: '/metricas', icon: BarChart2,       label: 'Metricas' },
     { to: '/config',   icon: Settings,        label: 'Config' },
