@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Search, RefreshCw, Copy, Check, ChevronDown, ChevronUp, Building2 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { STATUS_LABELS } from '@/types'
@@ -223,18 +223,21 @@ export default function ClientesPage() {
 
   useEffect(() => { load() }, [])
 
-  const filtered = clientes.filter(c => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return c.company_name.toLowerCase().includes(q) ||
-      c.company_cnpj.includes(search.replace(/\D/g, ''))
-  })
+  const filtered = useMemo(() => {
+    if (!search.trim()) return clientes
+    const q = search.trim().toLowerCase()
+    const cnpjQ = search.replace(/\D/g, '')
+    return clientes.filter(c =>
+      c.company_name.toLowerCase().includes(q) ||
+      (cnpjQ.length > 0 && c.company_cnpj.includes(cnpjQ))
+    )
+  }, [clientes, search])
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Comunicação Clientes</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Consolidação de pendências por cliente com geração de mensagem
           </p>
