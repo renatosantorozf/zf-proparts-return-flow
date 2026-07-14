@@ -77,6 +77,16 @@ function ClienteCard({ cliente }: { cliente: ClienteAgrupado }) {
             <p className="font-semibold text-gray-900">{cliente.company_name}</p>
             <p className="text-xs text-gray-400 mt-0.5">{cliente.company_cnpj}</p>
             <div className="flex flex-wrap gap-1.5 mt-2">
+              {cliente.tickets.filter(t => t.tipo === 'devolucao').length > 0 && (
+                <span className="badge bg-blue-100 text-blue-700 text-xs font-medium">
+                  {cliente.tickets.filter(t => t.tipo === 'devolucao').length} Dev.
+                </span>
+              )}
+              {cliente.tickets.filter(t => t.tipo === 'garantia').length > 0 && (
+                <span className="badge bg-purple-100 text-purple-700 text-xs font-medium">
+                  {cliente.tickets.filter(t => t.tipo === 'garantia').length} Gar.
+                </span>
+              )}
               {Object.entries(statusCount).map(([label, count]) => (
                 <span key={label} className="badge bg-gray-100 text-gray-600 text-xs">
                   {count}× {label}
@@ -138,7 +148,12 @@ function ClienteCard({ cliente }: { cliente: ClienteAgrupado }) {
                     {t.itens.length > 2 && <p className="text-xs text-gray-400">+{t.itens.length - 2} item(s)</p>}
                   </td>
                   <td className="px-5 py-2.5">
-                    <span className="badge text-xs bg-blue-50 text-blue-700">
+                    <span className={`badge text-xs ${t.tipo === 'garantia' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {t.tipo === 'garantia' ? 'Garantia' : 'Devolução'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-2.5">
+                    <span className="badge text-xs bg-gray-100 text-gray-700">
                       {STATUS_LABELS[t.status] ?? t.status}
                     </span>
                   </td>
@@ -208,10 +223,12 @@ export default function ClientesPage() {
 
   useEffect(() => { load() }, [])
 
-  const filtered = clientes.filter(c =>
-    !search || c.company_name.toLowerCase().includes(search.toLowerCase()) ||
-    c.company_cnpj.includes(search.replace(/\D/g, ''))
-  )
+  const filtered = clientes.filter(c => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return c.company_name.toLowerCase().includes(q) ||
+      c.company_cnpj.includes(search.replace(/\D/g, ''))
+  })
 
   return (
     <div className="space-y-5">
