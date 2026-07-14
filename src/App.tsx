@@ -8,6 +8,7 @@ import PlaybookPage from '@/pages/PlaybookPage'
 import ConfigPage from '@/pages/ConfigPage'
 import MetricasPage from '@/pages/MetricasPage'
 import OficinasPage from '@/pages/OficinasPage'
+import ClientesPage from '@/pages/ClientesPage'
 import Layout from '@/components/Layout'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -38,6 +39,7 @@ function AppRoutes() {
         <Route path="tickets/:id" element={<TicketPage />} />
         <Route path="playbook" element={<PlaybookPage />} />
         <Route path="oficinas" element={<OficinasPage />} />
+        <Route path="clientes" element={<ClientesPage />} />
         <Route path="metricas" element={<MetricasPage />} />
         <Route path="config" element={<ConfigPage />} />
       </Route>
