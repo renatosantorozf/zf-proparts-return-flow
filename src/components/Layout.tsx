@@ -12,7 +12,7 @@ export default function Layout() {
     { to: '/kanban',   icon: LayoutDashboard, label: 'Kanban' },
     { to: '/pedidos',  icon: Package,         label: 'Pedidos' },
     { to: '/oficinas', icon: Building2,       label: 'Oficinas' },
-    { to: '/clientes', icon: Users,           label: 'Clientes' },
+    { to: '/clientes', icon: Users,           label: 'Comunic. Clientes' },
     { to: '/playbook', icon: BookOpen,        label: 'Sellers' },
     { to: '/metricas', icon: BarChart2,       label: 'Metricas' },
     { to: '/config',   icon: Settings,        label: 'Config' },
