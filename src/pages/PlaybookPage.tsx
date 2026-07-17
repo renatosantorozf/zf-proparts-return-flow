@@ -106,6 +106,7 @@ function SellerForm({ seller, onSave, onCancel }: {
 }) {
   const [form, setForm] = useState<Record<string, string>>({
     nome_fantasia: (seller as any).nome_fantasia ?? '',
+          prazo_devolucao_dias: String((seller as any).prazo_devolucao_dias ?? ''),
     canal_preferencial: seller.canal_preferencial ?? 'ambos',
     contato_nome: seller.contato_nome ?? '',
     contato_email: seller.contato_email ?? '',
@@ -151,6 +152,20 @@ function SellerForm({ seller, onSave, onCancel }: {
           onChange={e => set('nome_fantasia', e.target.value)}
           className="input"
           placeholder="Ex: SKY Automotive, Compel Pecas..."
+        />
+      </div>
+
+      {/* Prazo de devolucao */}
+      <div>
+        <label className={lc}>Prazo máx. de devolução <span className="text-gray-400 font-normal">(dias, opcional)</span></label>
+        <input
+          type="number"
+          min="1"
+          max="365"
+          value={String((form as any).prazo_devolucao_dias ?? '')}
+          onChange={e => set('prazo_devolucao_dias', e.target.value)}
+          className="input"
+          placeholder="Ex: 30"
         />
       </div>
 
