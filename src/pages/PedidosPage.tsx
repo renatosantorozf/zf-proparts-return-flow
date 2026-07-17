@@ -284,7 +284,7 @@ export default function PedidosPage() {
       order_vehicle: selectedOrder.order_vehicle,
       merchant_reference: seller?.merchant_reference ?? null,
       merchant_name: seller?.merchant_name ?? null,
-      numero_nf: selectedOrder.numero_nf || null,
+      numero_nf: ticketItems[0]?.item_nota_fiscal || selectedOrder.numero_nf || null,
       chave_xml_nf: ticketDraft.chaveXml || null,
       mei_status: meiStatus,
       devolucao_tipo: devolucaoTipo,
