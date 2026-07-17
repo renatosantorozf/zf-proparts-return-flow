@@ -35,6 +35,9 @@ function SellerCard({ seller, onEdit }: { seller: Seller; onEdit: () => void }) 
             )}
           </div>
           <p className="text-xs text-gray-400 mt-0.5">#{seller.merchant_reference}</p>
+          {(seller as any).prazo_devolucao_dias && (
+            <p className="text-xs text-amber-600 mt-1 font-medium">⏱ Prazo: {(seller as any).prazo_devolucao_dias} dias</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="badge bg-zf-blue-light text-zf-blue flex items-center gap-1">
@@ -135,6 +138,9 @@ function SellerForm({ seller, onSave, onCancel }: {
       <div>
         <h2 className="font-bold text-gray-900 text-lg">{seller.merchant_name}</h2>
         <p className="text-sm text-gray-500 mt-0.5">#{seller.merchant_reference}</p>
+        {(seller as any).prazo_devolucao_dias && (
+          <p className="text-sm text-amber-600 mt-1 font-medium">⏱ Prazo máximo de devolução: {(seller as any).prazo_devolucao_dias} dias</p>
+        )}
       </div>
 
       {/* Nome Fantasia */}
