@@ -71,7 +71,7 @@ function useMetricasEstrategicas(period: number) {
           .filter(c => c.total >= 2)
           .sort((a, b) => b.total - a.total)
           .slice(0, 10)
-          .map(c => ({ ...c, periodos: c.total }))
+          .map(c => ({ ...c, total_tickets: c.total, periodos: c.total }))
       )
 
       setLoading(false)
