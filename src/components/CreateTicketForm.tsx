@@ -39,6 +39,7 @@ export function CreateTicketForm({
   const [chaveXml, setChaveXml] = useState(order.chave_xml_nf ?? '')  // pré-preenchido da planilha
   const [error, setError] = useState('')
   const [sellerNome, setSellerNome] = useState<string>('')
+  const [sellerPrazo, setSellerPrazo] = useState<number | null>(null)
   const [canalPreenchido, setCanalPreenchido] = useState(false)
 
   const sellerDoItem = selectedItems[0]
@@ -52,9 +53,19 @@ export function CreateTicketForm({
         setSellerNome(s.merchant_name)
         setCanal(canalPlaybookParaEntrada(s.canal_preferencial))
         setCanalPreenchido(true)
+        setSellerPrazo((s as any).prazo_devolucao_dias ?? null)
       }
     })
   }, [merchantReference])
+
+  // Calcular dias desde o pedido
+  const diasDesdePedido = order.order_created_at
+    ? Math.floor((Date.now() - new Date(order.order_created_at).getTime()) / (1000 * 60 * 60 * 24))
+    : null
+
+  const alertaPrazo = sellerPrazo !== null && diasDesdePedido !== null && diasDesdePedido > sellerPrazo
+  const proximoPrazo = sellerPrazo !== null && diasDesdePedido !== null &&
+    !alertaPrazo && diasDesdePedido >= sellerPrazo - 5
 
   // Suprimir warning de meiStatus nao usado diretamente
   void meiStatus
