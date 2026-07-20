@@ -63,9 +63,9 @@ export function CreateTicketForm({
     ? Math.floor((Date.now() - new Date(order.order_created_at).getTime()) / (1000 * 60 * 60 * 24))
     : null
 
-  const alertaPrazo = sellerPrazo !== null && diasDesdePedido !== null && diasDesdePedido > sellerPrazo
-  const proximoPrazo = sellerPrazo !== null && diasDesdePedido !== null &&
-    !alertaPrazo && diasDesdePedido >= sellerPrazo - 5
+  const prazoEfetivo = sellerPrazo ?? 7  // fallback: 7 dias se seller nao tiver prazo cadastrado
+  const alertaPrazo = diasDesdePedido !== null && diasDesdePedido > prazoEfetivo
+  const proximoPrazo = diasDesdePedido !== null && !alertaPrazo && diasDesdePedido >= prazoEfetivo - 5
 
   // Suprimir warning de meiStatus nao usado diretamente
   void meiStatus
