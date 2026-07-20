@@ -4,14 +4,6 @@ import { useMetrics } from '@/hooks/useMetrics'
 import { db } from '@/lib/db'
 
 
-interface SellerAprovacao {
-  merchant_name: string
-  total: number
-  aprovados: number
-  recusados: number
-  taxa_aprovacao: number
-}
-
 interface SkuVolume {
   item_sku: string
   item_name: string
@@ -26,7 +18,6 @@ interface ClienteReincidencia {
 }
 
 function useMetricasEstrategicas(period: number) {
-  const [aprovacaoSellers, setAprovacaoSellers] = useState<SellerAprovacao[]>([])
   const [volumeSku, setVolumeSku] = useState<SkuVolume[]>([])
   const [reincidentes, setReincidentes] = useState<ClienteReincidencia[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,33 +26,6 @@ function useMetricasEstrategicas(period: number) {
     async function load() {
       setLoading(true)
       const since = new Date(Date.now() - period * 86400000).toISOString()
-
-      // 1. Taxa de aprovacao por seller
-      const { data: tickets } = await db
-        .from('tickets')
-        .select('merchant_name, status')
-        .gte('created_at', since)
-        .in('status', ['autorizado', 'recusado', 'encerrado', 'logistica_reversa_concluida', 'pronto_para_retirada'])
-
-      const sellerMap = new Map<string, { total: number; aprovados: number; recusados: number }>()
-      for (const t of (tickets ?? []) as any[]) {
-        if (!sellerMap.has(t.merchant_name)) sellerMap.set(t.merchant_name, { total: 0, aprovados: 0, recusados: 0 })
-        const s = sellerMap.get(t.merchant_name)!
-        s.total++
-        if (t.status === 'recusado') s.recusados++
-        else s.aprovados++
-      }
-      setAprovacaoSellers(
-        Array.from(sellerMap.entries())
-          .map(([merchant_name, v]) => ({
-            merchant_name,
-            ...v,
-            taxa_aprovacao: v.total > 0 ? Math.round((v.aprovados / v.total) * 100) : 0,
-          }))
-          .filter(s => s.total >= 2)
-          .sort((a, b) => a.taxa_aprovacao - b.taxa_aprovacao)
-          .slice(0, 10)
-      )
 
       // 2. Volume por SKU
       const { data: allTickets } = await db
@@ -115,7 +79,7 @@ function useMetricasEstrategicas(period: number) {
     load()
   }, [period])
 
-  return { aprovacaoSellers, volumeSku, reincidentes, loading }
+  return { volumeSku, reincidentes, loading }
 }
 
 function MetricCard({
@@ -258,7 +222,7 @@ export default function MetricasPage() {
   const [period, setPeriod] = useState(30)
   const { summary, loading } = useMetrics(period)
   const { sellers: rankingSellers, oficinas: rankingOficinas, loading: loadingRanking } = useRankings(period)
-  const { aprovacaoSellers, volumeSku, reincidentes, loading: loadingEstrategico } = useMetricasEstrategicas(period)
+  const { volumeSku, reincidentes, loading: loadingEstrategico } = useMetricasEstrategicas(period)
 
   return (
     <div className="space-y-6">
@@ -455,48 +419,6 @@ export default function MetricasPage() {
 
           {/* Metricas estrategicas */}
           <div className="space-y-5">
-
-            {/* Taxa de aprovacao por seller */}
-            <div className="card overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-                <CheckCircle size={16} className="text-green-500" />
-                <h2 className="font-semibold text-gray-800">Taxa de Aprovação por Seller</h2>
-                <span className="text-xs text-gray-400 ml-auto">Sellers com 2+ tickets resolvidos · {period} dias</span>
-              </div>
-              {loadingEstrategico
-                ? <div className="flex justify-center py-6"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
-                : aprovacaoSellers.length === 0
-                  ? <p className="text-sm text-gray-400 text-center py-6">Dados insuficientes no período</p>
-                  : <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Seller</th>
-                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Total</th>
-                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Aprovados</th>
-                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Recusados</th>
-                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Taxa Aprov.</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {aprovacaoSellers.map(s => (
-                          <tr key={s.merchant_name} className="hover:bg-gray-50">
-                            <td className="px-5 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">{s.merchant_name}</td>
-                            <td className="px-5 py-2.5 text-right text-gray-600">{s.total}</td>
-                            <td className="px-5 py-2.5 text-right text-green-600 font-medium">{s.aprovados}</td>
-                            <td className="px-5 py-2.5 text-right text-red-500 font-medium">{s.recusados}</td>
-                            <td className="px-5 py-2.5 text-right">
-                              <span className={`badge text-xs font-bold ${
-                                s.taxa_aprovacao >= 80 ? 'bg-green-100 text-green-700' :
-                                s.taxa_aprovacao >= 50 ? 'bg-amber-100 text-amber-700' :
-                                'bg-red-100 text-red-700'
-                              }`}>{s.taxa_aprovacao}%</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-              }
-            </div>
 
             {/* Volume por SKU */}
             <div className="card overflow-hidden">
