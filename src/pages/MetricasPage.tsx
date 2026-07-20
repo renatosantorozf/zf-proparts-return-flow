@@ -58,7 +58,6 @@ function useMetricasEstrategicas(period: number) {
         .from('tickets')
         .select('company_name, company_cnpj, created_at')
         .gte('created_at', since)
-        .not('status', 'in', '("encerrado","recusado")')
 
       const clienteMap = new Map<string, { company_name: string; company_cnpj: string; total: number }>()
       for (const t of (ticketsClientes ?? []) as any[]) {
@@ -465,7 +464,7 @@ export default function MetricasPage() {
               <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
                 <TrendingDown size={16} className="text-red-500" />
                 <h2 className="font-semibold text-gray-800">Clientes Reincidentes</h2>
-                <span className="text-xs text-gray-400 ml-auto">2+ tickets abertos · {period} dias</span>
+                <span className="text-xs text-gray-400 ml-auto">2+ tickets no período · {period} dias</span>
               </div>
               {loadingEstrategico
                 ? <div className="flex justify-center py-6"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
