@@ -1,6 +1,122 @@
 import { useState, useEffect } from 'react'
 import { RefreshCw, TrendingDown, Clock, CheckCircle, AlertCircle, BarChart2, Trophy } from 'lucide-react'
 import { useMetrics } from '@/hooks/useMetrics'
+import { db } from '@/lib/db'
+
+
+interface SellerAprovacao {
+  merchant_name: string
+  total: number
+  aprovados: number
+  recusados: number
+  taxa_aprovacao: number
+}
+
+interface SkuVolume {
+  item_sku: string
+  item_name: string
+  total: number
+}
+
+interface ClienteReincidencia {
+  company_name: string
+  company_cnpj: string
+  total_tickets: number
+  periodos: number
+}
+
+function useMetricasEstrategicas(period: number) {
+  const [aprovacaoSellers, setAprovacaoSellers] = useState<SellerAprovacao[]>([])
+  const [volumeSku, setVolumeSku] = useState<SkuVolume[]>([])
+  const [reincidentes, setReincidentes] = useState<ClienteReincidencia[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const since = new Date(Date.now() - period * 86400000).toISOString()
+
+      // 1. Taxa de aprovacao por seller
+      const { data: tickets } = await db
+        .from('tickets')
+        .select('merchant_name, status')
+        .gte('created_at', since)
+        .in('status', ['autorizado', 'recusado', 'encerrado', 'logistica_reversa_concluida', 'pronto_para_retirada'])
+
+      const sellerMap = new Map<string, { total: number; aprovados: number; recusados: number }>()
+      for (const t of (tickets ?? []) as any[]) {
+        if (!sellerMap.has(t.merchant_name)) sellerMap.set(t.merchant_name, { total: 0, aprovados: 0, recusados: 0 })
+        const s = sellerMap.get(t.merchant_name)!
+        s.total++
+        if (t.status === 'recusado') s.recusados++
+        else s.aprovados++
+      }
+      setAprovacaoSellers(
+        Array.from(sellerMap.entries())
+          .map(([merchant_name, v]) => ({
+            merchant_name,
+            ...v,
+            taxa_aprovacao: v.total > 0 ? Math.round((v.aprovados / v.total) * 100) : 0,
+          }))
+          .filter(s => s.total >= 2)
+          .sort((a, b) => a.taxa_aprovacao - b.taxa_aprovacao)
+          .slice(0, 10)
+      )
+
+      // 2. Volume por SKU
+      const { data: allTickets } = await db
+        .from('tickets')
+        .select('id')
+        .gte('created_at', since)
+
+      if (allTickets && allTickets.length > 0) {
+        const ids = (allTickets as any[]).map((t: any) => t.id)
+        const { data: items } = await db
+          .from('ticket_items')
+          .select('item_sku, item_name')
+          .in('ticket_id', ids)
+
+        const skuMap = new Map<string, { item_name: string; total: number }>()
+        for (const i of (items ?? []) as any[]) {
+          if (!skuMap.has(i.item_sku)) skuMap.set(i.item_sku, { item_name: i.item_name, total: 0 })
+          skuMap.get(i.item_sku)!.total++
+        }
+        setVolumeSku(
+          Array.from(skuMap.entries())
+            .map(([item_sku, v]) => ({ item_sku, ...v }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 10)
+        )
+      }
+
+      // 3. Taxa de reincidencia — clientes com 2+ tickets no periodo
+      const { data: ticketsClientes } = await db
+        .from('tickets')
+        .select('company_name, company_cnpj, created_at')
+        .gte('created_at', since)
+        .not('status', 'in', '("encerrado","recusado")')
+
+      const clienteMap = new Map<string, { company_name: string; company_cnpj: string; total: number }>()
+      for (const t of (ticketsClientes ?? []) as any[]) {
+        const key = t.company_cnpj || t.company_name
+        if (!clienteMap.has(key)) clienteMap.set(key, { company_name: t.company_name, company_cnpj: t.company_cnpj, total: 0 })
+        clienteMap.get(key)!.total++
+      }
+      setReincidentes(
+        Array.from(clienteMap.values())
+          .filter(c => c.total >= 2)
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 10)
+          .map(c => ({ ...c, periodos: c.total }))
+      )
+
+      setLoading(false)
+    }
+    load()
+  }, [period])
+
+  return { aprovacaoSellers, volumeSku, reincidentes, loading }
+}
 
 function MetricCard({
   label, value, sub, color, icon
@@ -142,6 +258,7 @@ export default function MetricasPage() {
   const [period, setPeriod] = useState(30)
   const { summary, loading } = useMetrics(period)
   const { sellers: rankingSellers, oficinas: rankingOficinas, loading: loadingRanking } = useRankings(period)
+  const { aprovacaoSellers, volumeSku, reincidentes, loading: loadingEstrategico } = useMetricasEstrategicas(period)
 
   return (
     <div className="space-y-6">
@@ -333,6 +450,132 @@ export default function MetricasPage() {
               {loadingRanking
                 ? <div className="flex justify-center py-8"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
                 : <RankingTable items={rankingOficinas} label="Oficina" />}
+            </div>
+          </div>
+
+          {/* Metricas estrategicas */}
+          <div className="space-y-5">
+
+            {/* Taxa de aprovacao por seller */}
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+                <CheckCircle size={16} className="text-green-500" />
+                <h2 className="font-semibold text-gray-800">Taxa de Aprovação por Seller</h2>
+                <span className="text-xs text-gray-400 ml-auto">Sellers com 2+ tickets resolvidos · {period} dias</span>
+              </div>
+              {loadingEstrategico
+                ? <div className="flex justify-center py-6"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
+                : aprovacaoSellers.length === 0
+                  ? <p className="text-sm text-gray-400 text-center py-6">Dados insuficientes no período</p>
+                  : <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Seller</th>
+                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Total</th>
+                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Aprovados</th>
+                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Recusados</th>
+                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Taxa Aprov.</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {aprovacaoSellers.map(s => (
+                          <tr key={s.merchant_name} className="hover:bg-gray-50">
+                            <td className="px-5 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">{s.merchant_name}</td>
+                            <td className="px-5 py-2.5 text-right text-gray-600">{s.total}</td>
+                            <td className="px-5 py-2.5 text-right text-green-600 font-medium">{s.aprovados}</td>
+                            <td className="px-5 py-2.5 text-right text-red-500 font-medium">{s.recusados}</td>
+                            <td className="px-5 py-2.5 text-right">
+                              <span className={`badge text-xs font-bold ${
+                                s.taxa_aprovacao >= 80 ? 'bg-green-100 text-green-700' :
+                                s.taxa_aprovacao >= 50 ? 'bg-amber-100 text-amber-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>{s.taxa_aprovacao}%</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+              }
+            </div>
+
+            {/* Volume por SKU */}
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+                <AlertCircle size={16} className="text-amber-500" />
+                <h2 className="font-semibold text-gray-800">Peças com Mais Devoluções</h2>
+                <span className="text-xs text-gray-400 ml-auto">Top 10 SKUs · {period} dias</span>
+              </div>
+              {loadingEstrategico
+                ? <div className="flex justify-center py-6"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
+                : volumeSku.length === 0
+                  ? <p className="text-sm text-gray-400 text-center py-6">Nenhum dado no período</p>
+                  : <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">#</th>
+                          <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Peça</th>
+                          <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">SKU</th>
+                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Ocorrências</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {volumeSku.map((s, i) => (
+                          <tr key={s.item_sku} className="hover:bg-gray-50">
+                            <td className="px-5 py-2.5 text-gray-400 text-xs">{i + 1}º</td>
+                            <td className="px-5 py-2.5 text-gray-800 max-w-[240px] truncate">{s.item_name}</td>
+                            <td className="px-5 py-2.5 font-mono text-xs text-gray-500">{s.item_sku}</td>
+                            <td className="px-5 py-2.5 text-right">
+                              <span className={`badge text-xs font-bold ${
+                                s.total >= 5 ? 'bg-red-100 text-red-700' :
+                                s.total >= 3 ? 'bg-amber-100 text-amber-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>{s.total}×</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+              }
+            </div>
+
+            {/* Reincidencia de clientes */}
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+                <TrendingDown size={16} className="text-red-500" />
+                <h2 className="font-semibold text-gray-800">Clientes Reincidentes</h2>
+                <span className="text-xs text-gray-400 ml-auto">2+ tickets abertos · {period} dias</span>
+              </div>
+              {loadingEstrategico
+                ? <div className="flex justify-center py-6"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
+                : reincidentes.length === 0
+                  ? <p className="text-sm text-gray-400 text-center py-6">Nenhum cliente reincidente no período</p>
+                  : <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Cliente</th>
+                          <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">CNPJ</th>
+                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Tickets abertos</th>
+                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Risco</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {reincidentes.map(c => (
+                          <tr key={c.company_cnpj || c.company_name} className="hover:bg-gray-50">
+                            <td className="px-5 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">{c.company_name}</td>
+                            <td className="px-5 py-2.5 text-xs text-gray-500">{c.company_cnpj}</td>
+                            <td className="px-5 py-2.5 text-right font-bold text-gray-900">{c.total_tickets}</td>
+                            <td className="px-5 py-2.5 text-right">
+                              <span className={`badge text-xs font-bold ${
+                                c.total_tickets >= 5 ? 'bg-red-100 text-red-700' :
+                                c.total_tickets >= 3 ? 'bg-amber-100 text-amber-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>{c.total_tickets >= 5 ? 'Alto' : c.total_tickets >= 3 ? 'Médio' : 'Baixo'}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+              }
             </div>
           </div>
 
