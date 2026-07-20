@@ -164,6 +164,7 @@ function SellerForm({ seller, onSave, onCancel }: {
           max="365"
           value={String((form as any).prazo_devolucao_dias ?? '')}
           onChange={e => set('prazo_devolucao_dias', e.target.value)}
+          onWheel={e => (e.target as HTMLInputElement).blur()}
           className="input"
           placeholder="Ex: 30"
         />
