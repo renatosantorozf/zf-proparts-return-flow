@@ -222,11 +222,99 @@ function RankingTable({ items, label }: { items: RankingItem[], label: string })
   )
 }
 
+
+interface TaxaDevolucaoCliente {
+  company_name: string
+  company_cnpj: string
+  itens_comprados: number
+  itens_devolvidos: number
+  taxa_devolucao: number
+}
+
+function useTaxaDevolucaoCliente(dateFrom: string, dateTo: string) {
+  const [dados, setDados] = useState<TaxaDevolucaoCliente[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const since = dateFrom + 'T00:00:00'
+      const until = dateTo + 'T23:59:59'
+
+      // 1. Itens comprados (planilha orders) no periodo, por cliente
+      const { data: orders } = await db
+        .from('orders')
+        .select('company_name, company_cnpj, item_quantity, order_created_at')
+        .gte('order_created_at', since)
+        .lte('order_created_at', until)
+
+      const compradoMap = new Map<string, { company_name: string; total: number }>()
+      for (const o of (orders ?? []) as any[]) {
+        const key = o.company_cnpj || o.company_name
+        if (!key) continue
+        if (!compradoMap.has(key)) compradoMap.set(key, { company_name: o.company_name, total: 0 })
+        compradoMap.get(key)!.total += Number(o.item_quantity ?? 1)
+      }
+
+      // 2. Itens devolvidos (tickets + ticket_items) no periodo, por cliente
+      const { data: tickets } = await db
+        .from('tickets')
+        .select('id, company_name, company_cnpj')
+        .gte('created_at', since)
+        .lte('created_at', until)
+
+      const devolvidoMap = new Map<string, { company_name: string; total: number }>()
+      if (tickets && tickets.length > 0) {
+        const ticketCnpjMap = new Map<string, string>()
+        for (const t of tickets as any[]) {
+          const key = t.company_cnpj || t.company_name
+          if (key) ticketCnpjMap.set(t.id, key)
+        }
+        const ids = (tickets as any[]).map((t: any) => t.id)
+        const { data: items } = await db
+          .from('ticket_items')
+          .select('ticket_id, qtd_devolvida')
+          .in('ticket_id', ids)
+
+        for (const i of (items ?? []) as any[]) {
+          const key = ticketCnpjMap.get(i.ticket_id)
+          if (!key) continue
+          const t = (tickets as any[]).find((tk: any) => tk.id === i.ticket_id)
+          if (!devolvidoMap.has(key)) devolvidoMap.set(key, { company_name: t?.company_name ?? '', total: 0 })
+          devolvidoMap.get(key)!.total += Number(i.qtd_devolvida ?? 1)
+        }
+      }
+
+      // 3. Combinar — so exibe clientes com pelo menos 1 item comprado
+      const resultado: TaxaDevolucaoCliente[] = []
+      for (const [cnpj, comprado] of compradoMap.entries()) {
+        const devolvido = devolvidoMap.get(cnpj)
+        const itensDevolvidos = devolvido?.total ?? 0
+        resultado.push({
+          company_name: comprado.company_name,
+          company_cnpj: cnpj,
+          itens_comprados: comprado.total,
+          itens_devolvidos: itensDevolvidos,
+          taxa_devolucao: comprado.total > 0 ? Math.round((itensDevolvidos / comprado.total) * 1000) / 10 : 0,
+        })
+      }
+
+      setDados(resultado.sort((a, b) => b.taxa_devolucao - a.taxa_devolucao).slice(0, 15))
+      setLoading(false)
+    }
+    load()
+  }, [dateFrom, dateTo])
+
+  return { dados, loading }
+}
+
 export default function MetricasPage() {
-  const [period, setPeriod] = useState(30)
-  const { summary, loading } = useMetrics(period)
-  const { sellers: rankingSellers, oficinas: rankingOficinas, loading: loadingRanking } = useRankings(period)
-  const { volumeSku, reincidentes, loading: loadingEstrategico } = useMetricasEstrategicas(period)
+  const [dateFrom, setDateFrom] = useState('2026-06-21')
+  const [dateTo, setDateTo] = useState('2026-07-21')
+  const {'summary, loading'} = useMetrics(dateFrom, dateTo)
+  const { sellers: rankingSellers, oficinas: rankingOficinas, loading: loadingRanking } = useRankings(dateFrom, dateTo)
+  const { volumeSku, reincidentes, loading: loadingEstrategico } = useMetricasEstrategicas(dateFrom, dateTo)
+  const { dados: taxaDevolucao, loading: loadingTaxa } = useTaxaDevolucaoCliente(dateFrom, dateTo)
 
   return (
     <div className="space-y-6">
