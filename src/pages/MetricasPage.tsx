@@ -242,14 +242,25 @@ function useTaxaDevolucaoCliente(dateFrom: string, dateTo: string) {
       const until = dateTo + 'T23:59:59'
 
       // 1. Itens comprados (planilha orders) no periodo, por cliente
-      const { data: orders } = await db
-        .from('orders')
-        .select('company_name, company_cnpj, item_quantity, order_created_at')
-        .gte('order_created_at', since)
-        .lte('order_created_at', until)
+      // Busca paginada — o Supabase limita a 1000 linhas por requisicao por padrao
+      const PAGE_SIZE = 1000
+      let allOrders: any[] = []
+      let from = 0
+      while (true) {
+        const { data: page } = await db
+          .from('orders')
+          .select('company_name, company_cnpj, item_quantity, order_created_at')
+          .gte('order_created_at', since)
+          .lte('order_created_at', until)
+          .range(from, from + PAGE_SIZE - 1)
+        if (!page || page.length === 0) break
+        allOrders = allOrders.concat(page)
+        if (page.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
 
       const compradoMap = new Map<string, { company_name: string; total: number }>()
-      for (const o of (orders ?? []) as any[]) {
+      for (const o of allOrders as any[]) {
         const key = o.company_cnpj || o.company_name
         if (!key) continue
         if (!compradoMap.has(key)) compradoMap.set(key, { company_name: o.company_name, total: 0 })
