@@ -323,17 +323,30 @@ export default function MetricasPage() {
           <h1 className="text-2xl font-bold text-gray-900">Metricas</h1>
           <p className="text-sm text-gray-500 mt-0.5">MTTR e volume de tickets de devolucao</p>
         </div>
-        <select
-          value={period}
-          onChange={e => setPeriod(Number(e.target.value))}
-          className="input w-44 text-sm"
-        >
-          <option value={7}>Ultimos 7 dias</option>
-          <option value={15}>Ultimos 15 dias</option>
-          <option value={30}>Ultimos 30 dias</option>
-          <option value={60}>Ultimos 60 dias</option>
-          <option value={90}>Ultimos 90 dias</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-400 mb-0.5">De</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              max={dateTo}
+              className="input text-sm py-1.5"
+            />
+          </div>
+          <span className="text-gray-300 mt-4">—</span>
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-400 mb-0.5">Até</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              min={dateFrom}
+              max={new Date().toISOString().split('T')[0]}
+              className="input text-sm py-1.5"
+            />
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -349,7 +362,7 @@ export default function MetricasPage() {
             <MetricCard
               label="Total de Tickets"
               value={String(summary.total_tickets)}
-              sub={`Ultimos ${period} dias`}
+              sub="Periodo selecionado"
               color="border-zf-blue"
               icon={<BarChart2 size={32} />}
             />
@@ -491,7 +504,7 @@ export default function MetricasPage() {
               <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
                 <Trophy size={16} className="text-amber-500" />
                 <h2 className="font-semibold text-gray-800">Sellers com mais devoluções</h2>
-                <span className="text-xs text-gray-400 ml-auto">Top 10 · {period} dias</span>
+                <span className="text-xs text-gray-400 ml-auto">Top 10 no período</span>
               </div>
               {loadingRanking
                 ? <div className="flex justify-center py-8"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
@@ -501,7 +514,7 @@ export default function MetricasPage() {
               <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
                 <Trophy size={16} className="text-amber-500" />
                 <h2 className="font-semibold text-gray-800">Oficinas com mais devoluções</h2>
-                <span className="text-xs text-gray-400 ml-auto">Top 10 · {period} dias</span>
+                <span className="text-xs text-gray-400 ml-auto">Top 10 no período</span>
               </div>
               {loadingRanking
                 ? <div className="flex justify-center py-8"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
@@ -517,7 +530,7 @@ export default function MetricasPage() {
               <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
                 <AlertCircle size={16} className="text-amber-500" />
                 <h2 className="font-semibold text-gray-800">Peças com Mais Devoluções</h2>
-                <span className="text-xs text-gray-400 ml-auto">Top 10 SKUs · {period} dias</span>
+                <span className="text-xs text-gray-400 ml-auto">Top 10 SKUs no período</span>
               </div>
               {loadingEstrategico
                 ? <div className="flex justify-center py-6"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
@@ -557,7 +570,7 @@ export default function MetricasPage() {
               <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
                 <TrendingDown size={16} className="text-red-500" />
                 <h2 className="font-semibold text-gray-800">Clientes Reincidentes</h2>
-                <span className="text-xs text-gray-400 ml-auto">2+ tickets no período · {period} dias</span>
+                <span className="text-xs text-gray-400 ml-auto">2+ tickets no período selecionado</span>
               </div>
               {loadingEstrategico
                 ? <div className="flex justify-center py-6"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
