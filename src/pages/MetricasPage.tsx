@@ -604,6 +604,46 @@ export default function MetricasPage() {
                     </table>
               }
             </div>
+
+            {/* Taxa de devolucao por cliente */}
+            <div className="card overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+                <BarChart2 size={16} className="text-zf-blue" />
+                <h2 className="font-semibold text-gray-800">Taxa de Devolução por Cliente</h2>
+                <span className="text-xs text-gray-400 ml-auto">Itens devolvidos ÷ itens comprados · Top 15</span>
+              </div>
+              {loadingTaxa
+                ? <div className="flex justify-center py-6"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
+                : taxaDevolucao.length === 0
+                  ? <p className="text-sm text-gray-400 text-center py-6">Sem dados de compra no período selecionado</p>
+                  : <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Cliente</th>
+                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Itens Comprados</th>
+                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Itens Devolvidos</th>
+                          <th className="text-right px-5 py-2 text-xs font-medium text-gray-500">Taxa</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {taxaDevolucao.map(c => (
+                          <tr key={c.company_cnpj || c.company_name} className="hover:bg-gray-50">
+                            <td className="px-5 py-2.5 font-medium text-gray-800 max-w-[200px] truncate">{c.company_name}</td>
+                            <td className="px-5 py-2.5 text-right text-gray-600">{c.itens_comprados}</td>
+                            <td className="px-5 py-2.5 text-right text-gray-600">{c.itens_devolvidos}</td>
+                            <td className="px-5 py-2.5 text-right">
+                              <span className={`badge text-xs font-bold ${
+                                c.taxa_devolucao >= 20 ? 'bg-red-100 text-red-700' :
+                                c.taxa_devolucao >= 10 ? 'bg-amber-100 text-amber-700' :
+                                'bg-green-100 text-green-700'
+                              }`}>{c.taxa_devolucao}%</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+              }
+            </div>
           </div>
 
           {summary.total_tickets === 0 && (
