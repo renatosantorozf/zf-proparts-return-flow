@@ -54,6 +54,7 @@ export interface Ticket {
   merchant_name?: string
   numero_nf?: string
   chave_xml_nf?: string
+  order_created_at?: string
   responsavel_id?: string
   responsavel_email?: string
   mei_status?: MeiStatus
