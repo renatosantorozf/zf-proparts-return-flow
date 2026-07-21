@@ -292,7 +292,6 @@ export default function PedidosPage() {
       valor_total_devolucao: 0,
       created_by: user?.id ?? null,
       data_solicitacao: new Date().toISOString().split('T')[0],
-      order_created_at: selectedOrder.order_created_at || null,
     }
 
     const items = ticketItems.map(i => ({
