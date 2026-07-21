@@ -311,7 +311,7 @@ function useTaxaDevolucaoCliente(dateFrom: string, dateTo: string) {
 export default function MetricasPage() {
   const [dateFrom, setDateFrom] = useState('2026-06-21')
   const [dateTo, setDateTo] = useState('2026-07-21')
-  const {'summary, loading'} = useMetrics(dateFrom, dateTo)
+  const { summary, loading } = useMetrics(dateFrom, dateTo)
   const { sellers: rankingSellers, oficinas: rankingOficinas, loading: loadingRanking } = useRankings(dateFrom, dateTo)
   const { volumeSku, reincidentes, loading: loadingEstrategico } = useMetricasEstrategicas(dateFrom, dateTo)
   const { dados: taxaDevolucao, loading: loadingTaxa } = useTaxaDevolucaoCliente(dateFrom, dateTo)
