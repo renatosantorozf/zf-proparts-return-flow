@@ -285,6 +285,7 @@ export default function PedidosPage() {
       merchant_reference: seller?.merchant_reference ?? null,
       merchant_name: seller?.merchant_name ?? null,
       numero_nf: (ticketItems[0] as any)?.item_nota_fiscal || selectedOrder.numero_nf || null,
+      order_created_at: selectedOrder.order_created_at || null,
       chave_xml_nf: ticketDraft.chaveXml || null,
       mei_status: meiStatus,
       devolucao_tipo: devolucaoTipo,
