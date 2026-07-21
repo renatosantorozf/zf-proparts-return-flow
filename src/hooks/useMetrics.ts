@@ -25,7 +25,7 @@ export interface MetricsSummary {
   tickets: TicketMetric[]
 }
 
-export function useMetrics(period = 90) {
+export function useMetrics(dateFrom: string, dateTo: string) {
   const [summary, setSummary] = useState<MetricsSummary | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -33,13 +33,15 @@ export function useMetrics(period = 90) {
     async function load() {
       setLoading(true)
       try {
-        const since = new Date(Date.now() - period * 86400000).toISOString()
+        const since = new Date(dateFrom + 'T00:00:00').toISOString()
+        const until = new Date(dateTo + 'T23:59:59').toISOString()
 
         // Busca todos os tickets do periodo
         const { data: tickets } = await db
           .from('tickets')
           .select('id, ticket_number, order_id, company_name, merchant_name, tipo, status, created_at')
           .gte('created_at', since)
+          .lte('created_at', until)
           .order('created_at', { ascending: false })
 
         if (!tickets || tickets.length === 0) {
@@ -137,7 +139,7 @@ export function useMetrics(period = 90) {
       }
     }
     load()
-  }, [period])
+  }, [dateFrom, dateTo])
 
   return { summary, loading }
 }
