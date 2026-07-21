@@ -192,12 +192,24 @@ export default function OficinasPage() {
 
   async function load() {
     setLoading(true)
-    const { data: tickets } = await db
-      .from('tickets')
-      .select('company_name, company_cnpj, order_city, order_state, status, created_at')
-      .order('created_at', { ascending: false })
 
-    if (!tickets) { setLoading(false); return }
+    // Busca paginada — evita truncamento silencioso quando o volume ultrapassar 1000 tickets
+    const PAGE_SIZE = 1000
+    let tickets: any[] = []
+    let from = 0
+    while (true) {
+      const { data: page } = await db
+        .from('tickets')
+        .select('company_name, company_cnpj, order_city, order_state, status, created_at')
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1)
+      if (!page || page.length === 0) break
+      tickets = tickets.concat(page)
+      if (page.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+
+    if (tickets.length === 0) { setLoading(false); return }
 
     // Agrupa por CNPJ
     const map = new Map<string, OficinaSummary>()
