@@ -95,6 +95,37 @@ export function CreateTicketForm({
         </p>
       </div>
 
+      {/* Alerta de prazo de devolucao */}
+      {alertaPrazo && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 flex gap-2">
+          <span className="text-red-500 shrink-0 text-base">⚠️</span>
+          <div>
+            <p className="text-sm font-semibold text-red-700">Prazo de devolução possivelmente expirado</p>
+            <p className="text-xs text-red-600 mt-0.5">
+              Este pedido tem <strong>{diasDesdePedido} dias</strong>. O prazo máximo de devolução
+              de <strong>{sellerNome || merchantName || 'este seller'}</strong> é de{' '}
+              <strong>{prazoEfetivo} dias</strong>{sellerPrazo === null ? ' (padrão)' : ''}.
+              Verifique com o seller antes de prosseguir.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {proximoPrazo && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 flex gap-2">
+          <span className="text-amber-500 shrink-0 text-base">⏱</span>
+          <div>
+            <p className="text-sm font-semibold text-amber-700">Prazo de devolução próximo do vencimento</p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              Este pedido tem <strong>{diasDesdePedido} dias</strong>. O prazo máximo de{' '}
+              <strong>{sellerNome || merchantName || 'este seller'}</strong> é{' '}
+              <strong>{prazoEfetivo} dias</strong>{sellerPrazo === null ? ' (padrão)' : ''}.
+              Restam <strong>{prazoEfetivo - (diasDesdePedido ?? 0)} dia(s)</strong>.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">Tipo *</label>
         <div className="flex gap-3">
