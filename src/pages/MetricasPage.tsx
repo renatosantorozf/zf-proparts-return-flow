@@ -17,7 +17,7 @@ interface ClienteReincidencia {
   periodos: number
 }
 
-function useMetricasEstrategicas(period: number) {
+function useMetricasEstrategicas(dateFrom: string, dateTo: string) {
   const [volumeSku, setVolumeSku] = useState<SkuVolume[]>([])
   const [reincidentes, setReincidentes] = useState<ClienteReincidencia[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,13 +25,15 @@ function useMetricasEstrategicas(period: number) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const since = new Date(Date.now() - period * 86400000).toISOString()
+      const since = new Date(dateFrom + 'T00:00:00').toISOString()
+      const until = new Date(dateTo + 'T23:59:59').toISOString()
 
       // 2. Volume por SKU
       const { data: allTickets } = await db
         .from('tickets')
         .select('id')
         .gte('created_at', since)
+        .lte('created_at', until)
 
       if (allTickets && allTickets.length > 0) {
         const ids = (allTickets as any[]).map((t: any) => t.id)
@@ -58,6 +60,7 @@ function useMetricasEstrategicas(period: number) {
         .from('tickets')
         .select('company_name, company_cnpj, created_at')
         .gte('created_at', since)
+        .lte('created_at', until)
 
       const clienteMap = new Map<string, { company_name: string; company_cnpj: string; total: number }>()
       for (const t of (ticketsClientes ?? []) as any[]) {
@@ -76,7 +79,7 @@ function useMetricasEstrategicas(period: number) {
       setLoading(false)
     }
     load()
-  }, [period])
+  }, [dateFrom, dateTo])
 
   return { volumeSku, reincidentes, loading }
 }
@@ -125,7 +128,7 @@ interface RankingItem {
   recusados: number
 }
 
-function useRankings(period: number) {
+function useRankings(dateFrom: string, dateTo: string) {
   const [sellers, setSellers] = useState<RankingItem[]>([])
   const [oficinas, setOficinas] = useState<RankingItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -133,11 +136,13 @@ function useRankings(period: number) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const since = new Date(Date.now() - period * 86400000).toISOString()
+      const since = new Date(dateFrom + 'T00:00:00').toISOString()
+      const until = new Date(dateTo + 'T23:59:59').toISOString()
       const { data } = await (await import('@/lib/db')).db
         .from('tickets')
         .select('merchant_name, company_name, status')
         .gte('created_at', since)
+        .lte('created_at', until)
 
       if (!data) { setLoading(false); return }
 
@@ -170,7 +175,7 @@ function useRankings(period: number) {
       setLoading(false)
     }
     load()
-  }, [period])
+  }, [dateFrom, dateTo])
 
   return { sellers, oficinas, loading }
 }
