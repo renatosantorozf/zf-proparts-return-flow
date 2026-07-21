@@ -177,6 +177,7 @@ export default function TicketPage() {
               <div><p className="text-xs text-gray-400">CNPJ</p><p className="font-medium">{formatarCNPJ(ticket.company_cnpj ?? '')}</p></div>
               <div><p className="text-xs text-gray-400">Seller</p><p className="font-medium">{(seller as any)?.nome_fantasia ? <>{(seller as any).nome_fantasia} <span className="text-gray-400 font-normal text-sm">· {ticket.merchant_name}</span></> : ticket.merchant_name}</p></div>
               <div><p className="text-xs text-gray-400">Loja nº</p><p className="font-medium">{ticket.merchant_reference || '—'}</p></div>
+              <div><p className="text-xs text-gray-400">Data do Pedido</p><p className="font-medium">{ticket.order_created_at ? new Date(ticket.order_created_at).toLocaleDateString('pt-BR') : '—'}</p></div>
               <div className="col-span-2"><p className="text-xs text-gray-400">Motivo</p><p className="font-medium">{ticket.motivo}</p></div>
             </div>
             {ticket.order_vehicle && (
