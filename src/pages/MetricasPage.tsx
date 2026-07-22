@@ -310,7 +310,9 @@ function useTaxaDevolucaoCliente(dateFrom: string, dateTo: string) {
         })
       }
 
-      setDados(resultado.sort((a, b) => b.taxa_devolucao - a.taxa_devolucao).slice(0, 50))
+      // Retorna todos os clientes — o filtro de volume minimo e o Top 15 sao aplicados na tela,
+      // apos o corte por volume, para nao perder clientes de alto volume com taxa % menor
+      setDados(resultado.sort((a, b) => b.taxa_devolucao - a.taxa_devolucao))
       setLoading(false)
     }
     load()
