@@ -310,7 +310,7 @@ function useTaxaDevolucaoCliente(dateFrom: string, dateTo: string) {
         })
       }
 
-      setDados(resultado.sort((a, b) => b.taxa_devolucao - a.taxa_devolucao).slice(0, 15))
+      setDados(resultado.sort((a, b) => b.taxa_devolucao - a.taxa_devolucao).slice(0, 50))
       setLoading(false)
     }
     load()
@@ -326,6 +326,7 @@ export default function MetricasPage() {
   const { sellers: rankingSellers, oficinas: rankingOficinas, loading: loadingRanking } = useRankings(dateFrom, dateTo)
   const { volumeSku, reincidentes, loading: loadingEstrategico } = useMetricasEstrategicas(dateFrom, dateTo)
   const { dados: taxaDevolucao, loading: loadingTaxa } = useTaxaDevolucaoCliente(dateFrom, dateTo)
+  const [minItensComprados, setMinItensComprados] = useState(5)
 
   return (
     <div className="space-y-6">
@@ -618,15 +619,33 @@ export default function MetricasPage() {
 
             {/* Taxa de devolucao por cliente */}
             <div className="card overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-                <BarChart2 size={16} className="text-zf-blue" />
-                <h2 className="font-semibold text-gray-800">Taxa de Devolução por Cliente</h2>
-                <span className="text-xs text-gray-400 ml-auto">Itens devolvidos ÷ itens comprados · Top 15</span>
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <BarChart2 size={16} className="text-zf-blue" />
+                  <h2 className="font-semibold text-gray-800">Taxa de Devolução por Cliente</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500 whitespace-nowrap">Mín. itens comprados:</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={minItensComprados}
+                    onChange={e => setMinItensComprados(Math.max(1, Number(e.target.value) || 1))}
+                    onWheel={e => (e.target as HTMLInputElement).blur()}
+                    className="input text-xs py-1 w-16 text-center"
+                  />
+                </div>
               </div>
-              {loadingTaxa
+              <div className="px-5 pt-2 pb-1">
+                <span className="text-xs text-gray-400">Itens devolvidos ÷ itens comprados · Top 15 clientes com {minItensComprados}+ itens comprados no período</span>
+              </div>
+              {(() => {
+                const dadosFiltrados = taxaDevolucao.filter(c => c.itens_comprados >= minItensComprados).slice(0, 15)
+                return loadingTaxa
                 ? <div className="flex justify-center py-6"><RefreshCw size={16} className="animate-spin text-gray-400" /></div>
-                : taxaDevolucao.length === 0
-                  ? <p className="text-sm text-gray-400 text-center py-6">Sem dados de compra no período selecionado</p>
+                : dadosFiltrados.length === 0
+                  ? <p className="text-sm text-gray-400 text-center py-6">Nenhum cliente com {minItensComprados}+ itens comprados no período selecionado</p>
                   : <table className="w-full text-sm">
                       <thead className="bg-gray-50">
                         <tr>
@@ -637,7 +656,7 @@ export default function MetricasPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {taxaDevolucao.map(c => (
+                        {dadosFiltrados.map(c => (
                           <tr key={c.company_cnpj || c.company_name} className="hover:bg-gray-50">
                             <td className="px-5 py-2.5 font-medium text-gray-800 max-w-[200px] truncate">{c.company_name}</td>
                             <td className="px-5 py-2.5 text-right text-gray-600">{c.itens_comprados}</td>
@@ -653,7 +672,7 @@ export default function MetricasPage() {
                         ))}
                       </tbody>
                     </table>
-              }
+              })()}
             </div>
           </div>
 
