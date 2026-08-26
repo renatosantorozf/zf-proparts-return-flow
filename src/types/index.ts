@@ -1,7 +1,6 @@
 export type TicketStatus =
   | 'aberto'
-  | 'contato_enviado'
-  | 'aguardando_autorizacao'
+  | 'contato_seller'
   | 'autorizado'
   | 'nfd_pendente'
   | 'pronto_para_retirada'
@@ -152,8 +151,7 @@ export interface SlaInfo {
 
 export const STATUS_LABELS: Record<TicketStatus, string> = {
   aberto: 'Aberto',
-  contato_enviado: 'Contato Enviado',
-  aguardando_autorizacao: 'Aguardando Autorização',
+  contato_seller: 'Contato com Seller',
   autorizado: 'Autorizado',
   nfd_pendente: 'NFD Pendente',
   pronto_para_retirada: 'Pronto para Retirada',
@@ -167,8 +165,7 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
 
 export const KANBAN_COLUMNS: TicketStatus[] = [
   'aberto',
-  'contato_enviado',
-  'aguardando_autorizacao',
+  'contato_seller',
   'autorizado',
   'nfd_pendente',
   'pronto_para_retirada',
