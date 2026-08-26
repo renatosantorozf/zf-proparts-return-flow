@@ -13,6 +13,7 @@ export type TicketStatus =
   | 'laudo_recebido'
 
 export type TicketTipo = 'devolucao' | 'garantia'
+export type DecisaoSeller = 'aguardando' | 'aceitou' | 'recusou'
 export type TicketSubtipo = 'proxima_entrega' | 'pos_entrega' | 'envio_fabrica'
 export type CanalEntrada = 'whatsapp_grupo' | 'whatsapp_individual' | 'email' | 'outro'
 export type MeiStatus = 'mei' | 'nao_mei' | 'nao_encontrado' | 'pessoa_fisica' | 'nao_verificado'
@@ -57,6 +58,9 @@ export interface Ticket {
   order_created_at?: string
   responsavel_id?: string
   responsavel_email?: string
+  decisao_seller?: DecisaoSeller
+  decisao_seller_motivo?: string
+  decisao_seller_data?: string
   mei_status?: MeiStatus
   devolucao_tipo: DevolucaoTipo
   valor_total_devolucao?: number
