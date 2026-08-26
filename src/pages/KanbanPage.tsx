@@ -92,6 +92,19 @@ function KanbanCard({ ticket, getSlaInfo, onClick, ultimoLog }: {
         ) : (
           <span className="text-xs text-gray-300">Sem responsável</span>
         )}
+
+        {/* Etiqueta de Decisao do Seller — so exibe quando relevante (respondido ou pos-estorno) */}
+        {(() => {
+          const decisao = (ticket as any).decisao_seller ?? 'aguardando'
+          const posEstorno = ['logistica_reversa_concluida', 'encerrado'].includes(ticket.status)
+          if (decisao === 'aguardando' && !posEstorno) return null
+          const cfg = {
+            aguardando: { label: 'Aguardando seller', cls: 'bg-gray-100 text-gray-600' },
+            aceitou:    { label: 'Aceitou',           cls: 'bg-green-100 text-green-700' },
+            recusou:    { label: 'Recusou',           cls: 'bg-red-100 text-red-700' },
+          }[decisao as 'aguardando' | 'aceitou' | 'recusou']
+          return <span className={`badge text-xs font-medium ${cfg.cls}`}>{cfg.label}</span>
+        })()}
       </div>
 
       {ultimoLog && (
