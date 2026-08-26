@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { RefreshCw, TrendingDown, Clock, CheckCircle, AlertCircle, BarChart2, Trophy } from 'lucide-react'
+import { RefreshCw, TrendingDown, Clock, CheckCircle, AlertCircle, BarChart2, Trophy, AlertTriangle } from 'lucide-react'
 import { useMetrics } from '@/hooks/useMetrics'
 import { db } from '@/lib/db'
 
@@ -321,6 +321,71 @@ function useTaxaDevolucaoCliente(dateFrom: string, dateTo: string) {
   return { dados, loading }
 }
 
+
+interface RecusaPosEstorno {
+  ticket_id: string
+  ticket_number: number
+  order_id: string
+  company_name: string
+  merchant_name: string
+  status: string
+  decisao_seller_data: string | null
+  decisao_seller_motivo: string | null
+  created_at: string
+}
+
+function useRecusasPosEstorno(dateFrom: string, dateTo: string) {
+  const [recusas, setRecusas] = useState<RecusaPosEstorno[]>([])
+  const [totalEstornados, setTotalEstornados] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const since = dateFrom + 'T00:00:00'
+      const until = dateTo + 'T23:59:59'
+
+      // Total de tickets com estorno realizado no periodo (denominador da taxa)
+      const { count } = await db
+        .from('tickets')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'encerrado')
+        .gte('created_at', since)
+        .lte('created_at', until)
+
+      setTotalEstornados(count ?? 0)
+
+      // Tickets com estorno realizado E decisao do seller = recusou
+      const { data } = await db
+        .from('tickets')
+        .select('id, ticket_number, order_id, company_name, merchant_name, status, decisao_seller_data, decisao_seller_motivo, created_at')
+        .eq('status', 'encerrado')
+        .eq('decisao_seller', 'recusou')
+        .gte('created_at', since)
+        .lte('created_at', until)
+        .order('decisao_seller_data', { ascending: false })
+
+      setRecusas((data ?? []).map((t: any) => ({
+        ticket_id: t.id,
+        ticket_number: t.ticket_number,
+        order_id: t.order_id,
+        company_name: t.company_name,
+        merchant_name: t.merchant_name,
+        status: t.status,
+        decisao_seller_data: t.decisao_seller_data,
+        decisao_seller_motivo: t.decisao_seller_motivo,
+        created_at: t.created_at,
+      })))
+      setLoading(false)
+    }
+    load()
+  }, [dateFrom, dateTo])
+
+  const taxa = totalEstornados > 0 ? Math.round((recusas.length / totalEstornados) * 1000) / 10 : 0
+
+  return { recusas, totalEstornados, taxa, loading }
+}
+
 export default function MetricasPage() {
   const [dateFrom, setDateFrom] = useState('2026-06-21')
   const [dateTo, setDateTo] = useState('2026-07-21')
@@ -329,6 +394,7 @@ export default function MetricasPage() {
   const { volumeSku, reincidentes, loading: loadingEstrategico } = useMetricasEstrategicas(dateFrom, dateTo)
   const { dados: taxaDevolucao, loading: loadingTaxa } = useTaxaDevolucaoCliente(dateFrom, dateTo)
   const [minItensComprados, setMinItensComprados] = useState(5)
+  const { recusas, totalEstornados, taxa: taxaRecusaPosEstorno, loading: loadingRecusas } = useRecusasPosEstorno(dateFrom, dateTo)
 
   return (
     <div className="space-y-6">
@@ -361,6 +427,67 @@ export default function MetricasPage() {
             />
           </div>
         </div>
+      </div>
+
+      {/* Recusas Pos-Estorno — metrica de risco financeiro, sempre no topo */}
+      <div className="card overflow-hidden border-l-4 border-red-400">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+          <AlertTriangle size={18} className="text-red-500" />
+          <h2 className="font-semibold text-gray-800">Recusas Pós-Estorno</h2>
+          <span className="text-xs text-gray-400">Seller recusou após o estorno já realizado — risco financeiro assumido</span>
+          {!loadingRecusas && (
+            <span className={`ml-auto badge text-sm font-bold ${
+              recusas.length === 0 ? 'bg-green-100 text-green-700' :
+              taxaRecusaPosEstorno >= 20 ? 'bg-red-100 text-red-700' :
+              taxaRecusaPosEstorno >= 10 ? 'bg-amber-100 text-amber-700' :
+              'bg-green-100 text-green-700'
+            }`}>
+              {recusas.length} caso{recusas.length !== 1 ? 's' : ''} · {taxaRecusaPosEstorno}% dos estornos
+            </span>
+          )}
+        </div>
+        {loadingRecusas ? (
+          <div className="flex justify-center py-8"><RefreshCw size={18} className="animate-spin text-gray-400" /></div>
+        ) : recusas.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">
+            Nenhuma recusa pós-estorno no período — {totalEstornados} estorno{totalEstornados !== 1 ? 's' : ''} realizado{totalEstornados !== 1 ? 's' : ''}
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Ticket</th>
+                <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Pedido</th>
+                <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Cliente</th>
+                <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Seller</th>
+                <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Data do Estorno</th>
+                <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Data da Recusa</th>
+                <th className="text-left px-5 py-2 text-xs font-medium text-gray-500">Motivo</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {recusas.map(r => (
+                <tr key={r.ticket_id} className="hover:bg-red-50/40">
+                  <td className="px-5 py-2.5">
+                    <a href={`/tickets/${r.ticket_id}`} className="font-mono font-bold text-zf-blue hover:underline text-xs">
+                      T#{r.ticket_number}
+                    </a>
+                  </td>
+                  <td className="px-5 py-2.5 font-mono text-xs text-gray-600">#{r.order_id}</td>
+                  <td className="px-5 py-2.5 text-gray-800 max-w-[160px] truncate">{r.company_name}</td>
+                  <td className="px-5 py-2.5 text-gray-600 max-w-[140px] truncate">{r.merchant_name}</td>
+                  <td className="px-5 py-2.5 text-xs text-gray-500">{new Date(r.created_at).toLocaleDateString('pt-BR')}</td>
+                  <td className="px-5 py-2.5 text-xs text-gray-500">
+                    {r.decisao_seller_data ? new Date(r.decisao_seller_data).toLocaleDateString('pt-BR') : '—'}
+                  </td>
+                  <td className="px-5 py-2.5 text-xs text-gray-600 max-w-[220px] truncate">
+                    {r.decisao_seller_motivo || '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {loading ? (
