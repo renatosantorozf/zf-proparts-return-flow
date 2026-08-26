@@ -23,6 +23,8 @@ export default function TicketPage() {
   const [logTipo, setLogTipo] = useState<LogTipo>('whatsapp')
   const [savingLog, setSavingLog] = useState(false)
   const [savingResp, setSavingResp] = useState(false)
+  const [savingDecisao, setSavingDecisao] = useState(false)
+  const [motivoRecusa, setMotivoRecusa] = useState((ticket as any)?.decisao_seller_motivo ?? '')
   const [usuarios, setUsuarios] = useState<string[]>([])
   const [showMsgModal, setShowMsgModal] = useState(false)
   const [msgChannel, setMsgChannel] = useState<'whatsapp' | 'email'>('whatsapp')
@@ -54,6 +56,20 @@ export default function TicketPage() {
       await addLog(id, 'sistema', 'Responsável removido', user?.id, user?.email ?? undefined)
     }
     setSavingResp(false)
+    refetch()
+  }
+
+  async function handleSetDecisaoSeller(decisao: 'aguardando' | 'aceitou' | 'recusou', motivo?: string) {
+    setSavingDecisao(true)
+    await db.from('tickets').update({
+      decisao_seller: decisao,
+      decisao_seller_motivo: decisao === 'recusou' ? (motivo ?? '') : null,
+      decisao_seller_data: decisao !== 'aguardando' ? new Date().toISOString() : null,
+    }).eq('id', id)
+
+    const labels = { aguardando: 'Aguardando', aceitou: 'Aceitou', recusou: 'Recusou' }
+    await addLog(id, 'sistema', `Decisão do seller: ${labels[decisao]}${decisao === 'recusou' && motivo ? ` — Motivo: ${motivo}` : ''}`, user?.id, user?.email ?? undefined)
+    setSavingDecisao(false)
     refetch()
   }
 
@@ -416,6 +432,63 @@ export default function TicketPage() {
                 <option key={email} value={email}>{email.split('@')[0]}</option>
               ))}
             </select>
+          </div>
+
+          {/* Decisão do Seller */}
+          <div className="card p-4 space-y-3">
+            <h3 className="font-semibold text-gray-800 text-sm">Decisão do Seller</h3>
+            <div className="flex gap-1.5">
+              {([
+                { key: 'aguardando', label: 'Aguardando', color: 'gray' },
+                { key: 'aceitou',    label: 'Aceitou',    color: 'green' },
+                { key: 'recusou',    label: 'Recusou',    color: 'red' },
+              ] as const).map(opt => {
+                const atual = ((ticket as any).decisao_seller ?? 'aguardando') === opt.key
+                return (
+                  <button
+                    key={opt.key}
+                    disabled={savingDecisao}
+                    onClick={() => {
+                      if (opt.key === 'recusou') {
+                        handleSetDecisaoSeller('recusou', motivoRecusa)
+                      } else {
+                        handleSetDecisaoSeller(opt.key)
+                      }
+                    }}
+                    className={
+                      'flex-1 text-xs py-1.5 rounded-lg border transition-colors font-medium ' +
+                      (atual
+                        ? opt.color === 'gray'
+                          ? 'border-gray-400 bg-gray-100 text-gray-700'
+                          : opt.color === 'green'
+                          ? 'border-green-400 bg-green-50 text-green-700'
+                          : 'border-red-400 bg-red-50 text-red-700'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300')
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+            {((ticket as any).decisao_seller === 'recusou') && (
+              <div className="space-y-1.5">
+                <label className="text-xs text-gray-500">Motivo da recusa</label>
+                <textarea
+                  value={motivoRecusa}
+                  onChange={e => setMotivoRecusa(e.target.value)}
+                  onBlur={() => handleSetDecisaoSeller('recusou', motivoRecusa)}
+                  placeholder="Descreva o motivo informado pelo seller..."
+                  className="input resize-none text-xs"
+                  rows={2}
+                />
+              </div>
+            )}
+            {(ticket as any).decisao_seller_data && (
+              <p className="text-xs text-gray-400">
+                Registrado em {new Date((ticket as any).decisao_seller_data).toLocaleDateString('pt-BR')}
+              </p>
+            )}
           </div>
 
           <div className="card p-4 space-y-2 text-xs text-gray-500">
