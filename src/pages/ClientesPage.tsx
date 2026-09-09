@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { STATUS_LABELS } from '@/types'
 import type { TicketStatus } from '@/types'
 
-const STATUS_EXCLUIDOS: TicketStatus[] = ['encerrado', 'recusado']
+const STATUS_EXCLUIDOS: TicketStatus[] = ['recusado']
 
 interface TicketResumo {
   id: string
@@ -182,8 +182,9 @@ export default function ClientesPage() {
 
     const { data: tickets } = await db
       .from('tickets')
-      .select('id, ticket_number, order_id, tipo, status, merchant_name, merchant_reference, motivo, company_name, company_cnpj')
+      .select('id, ticket_number, order_id, tipo, status, merchant_name, merchant_reference, motivo, company_name, company_cnpj, estorno_realizado')
       .not('status', 'in', `(${STATUS_EXCLUIDOS.map(s => `"${s}"`).join(',')})`)
+      .neq('estorno_realizado', true)
       .order('company_name')
 
     if (!tickets || tickets.length === 0) { setLoading(false); return }
