@@ -57,6 +57,9 @@ export interface Ticket {
   order_created_at?: string
   responsavel_id?: string
   responsavel_email?: string
+  estorno_realizado?: boolean
+  estorno_realizado_data?: string
+  estorno_realizado_por?: string
   decisao_seller?: DecisaoSeller
   decisao_seller_motivo?: string
   decisao_seller_data?: string
@@ -170,6 +173,5 @@ export const KANBAN_COLUMNS: TicketStatus[] = [
   'nfd_pendente',
   'pronto_para_retirada',
   'logistica_reversa_concluida',
-  'encerrado',
   'recusado',
 ]
