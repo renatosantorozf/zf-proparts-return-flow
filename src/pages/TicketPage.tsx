@@ -24,6 +24,7 @@ export default function TicketPage() {
   const [savingLog, setSavingLog] = useState(false)
   const [savingResp, setSavingResp] = useState(false)
   const [savingDecisao, setSavingDecisao] = useState(false)
+  const [savingEstorno, setSavingEstorno] = useState(false)
   const [motivoRecusa, setMotivoRecusa] = useState((ticket as any)?.decisao_seller_motivo ?? '')
   const [usuarios, setUsuarios] = useState<string[]>([])
   const [showMsgModal, setShowMsgModal] = useState(false)
@@ -70,6 +71,23 @@ export default function TicketPage() {
     const labels = { aguardando: 'Aguardando', aceitou: 'Aceitou', recusou: 'Recusou' }
     await addLog(id, 'sistema', `Decisão do seller: ${labels[decisao]}${decisao === 'recusou' && motivo ? ` — Motivo: ${motivo}` : ''}`, user?.id, user?.email ?? undefined)
     setSavingDecisao(false)
+    refetch()
+  }
+
+  async function handleSetEstornoRealizado(valor: boolean) {
+    setSavingEstorno(true)
+    await db.from('tickets').update({
+      estorno_realizado: valor,
+      estorno_realizado_data: valor ? new Date().toISOString() : null,
+      estorno_realizado_por: valor ? (user?.id ?? null) : null,
+    }).eq('id', id)
+
+    await addLog(
+      id, 'sistema',
+      valor ? 'Estorno realizado' : 'Estorno desmarcado',
+      user?.id, user?.email ?? undefined
+    )
+    setSavingEstorno(false)
     refetch()
   }
 
@@ -489,6 +507,47 @@ export default function TicketPage() {
                 Registrado em {new Date((ticket as any).decisao_seller_data).toLocaleDateString('pt-BR')}
               </p>
             )}
+          </div>
+
+          {/* Estorno Realizado */}
+          <div className="card p-4 space-y-3">
+            <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
+              💰 Estorno Realizado
+            </h3>
+            <div className="flex gap-1.5">
+              <button
+                disabled={savingEstorno}
+                onClick={() => handleSetEstornoRealizado(false)}
+                className={
+                  'flex-1 text-xs py-1.5 rounded-lg border transition-colors font-medium ' +
+                  (!(ticket as any).estorno_realizado
+                    ? 'border-gray-400 bg-gray-100 text-gray-700'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-300')
+                }
+              >
+                Não
+              </button>
+              <button
+                disabled={savingEstorno}
+                onClick={() => handleSetEstornoRealizado(true)}
+                className={
+                  'flex-1 text-xs py-1.5 rounded-lg border transition-colors font-medium ' +
+                  ((ticket as any).estorno_realizado
+                    ? 'border-green-400 bg-green-50 text-green-700'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-300')
+                }
+              >
+                Sim
+              </button>
+            </div>
+            {(ticket as any).estorno_realizado && (ticket as any).estorno_realizado_data && (
+              <p className="text-xs text-gray-400">
+                Realizado em {new Date((ticket as any).estorno_realizado_data).toLocaleDateString('pt-BR')} via PagBrasil
+              </p>
+            )}
+            <p className="text-xs text-gray-400">
+              Independente da etapa de logística reversa — marque assim que confirmar o processamento no PagBrasil.
+            </p>
           </div>
 
           <div className="card p-4 space-y-2 text-xs text-gray-500">
