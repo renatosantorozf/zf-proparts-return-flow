@@ -200,7 +200,7 @@ export default function OficinasPage() {
     while (true) {
       const { data: page } = await db
         .from('tickets')
-        .select('company_name, company_cnpj, order_city, order_state, status, created_at')
+        .select('company_name, company_cnpj, order_city, order_state, status, created_at, estorno_realizado')
         .order('created_at', { ascending: false })
         .range(from, from + PAGE_SIZE - 1)
       if (!page || page.length === 0) break
@@ -230,7 +230,7 @@ export default function OficinasPage() {
       }
       const o = map.get(cnpj)!
       o.total_tickets++
-      if (t.status === 'encerrado') o.encerrados++
+      if (t.estorno_realizado) o.encerrados++
       else if (t.status === 'recusado') o.recusados++
       else o.abertos++
     }
