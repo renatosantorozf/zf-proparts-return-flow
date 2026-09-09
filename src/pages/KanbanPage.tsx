@@ -92,27 +92,36 @@ function KanbanCard({ ticket, getSlaInfo, onClick, ultimoLog }: {
         ) : (
           <span className="text-xs text-gray-300">Sem responsável</span>
         )}
-
-        {/* Etiqueta de Estorno Realizado — Dimensao 3, independente da coluna */}
-        {(ticket as any).estorno_realizado && (
-          <span className="badge text-xs font-medium bg-emerald-100 text-emerald-700 flex items-center gap-1">
-            💰 Estorno Realizado
-          </span>
-        )}
-
-        {/* Etiqueta de Decisao do Seller — so exibe quando relevante (respondido ou estorno ja realizado) */}
-        {(() => {
-          const decisao = (ticket as any).decisao_seller ?? 'aguardando'
-          const estornoRealizado = !!(ticket as any).estorno_realizado
-          if (decisao === 'aguardando' && !estornoRealizado) return null
-          const cfg = {
-            aguardando: { label: 'Aguardando seller', cls: 'bg-gray-100 text-gray-600' },
-            aceitou:    { label: 'Aceitou',           cls: 'bg-green-100 text-green-700' },
-            recusou:    { label: 'Recusou',           cls: 'bg-red-100 text-red-700' },
-          }[decisao as 'aguardando' | 'aceitou' | 'recusou']
-          return <span className={`badge text-xs font-medium ${cfg.cls}`}>{cfg.label}</span>
-        })()}
       </div>
+
+      {/* Etiquetas de Estorno Realizado e Decisao do Seller — linha propria, com quebra automatica */}
+      {(() => {
+        const estornoRealizado = !!(ticket as any).estorno_realizado
+        const decisao = (ticket as any).decisao_seller ?? 'aguardando'
+        const mostrarDecisao = decisao !== 'aguardando' || estornoRealizado
+        if (!estornoRealizado && !mostrarDecisao) return null
+
+        const decisaoCfg = {
+          aguardando: { label: 'Aguardando seller', cls: 'bg-gray-100 text-gray-600' },
+          aceitou:    { label: 'Aceitou',           cls: 'bg-green-100 text-green-700' },
+          recusou:    { label: 'Recusou',           cls: 'bg-red-100 text-red-700' },
+        }[decisao as 'aguardando' | 'aceitou' | 'recusou']
+
+        return (
+          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+            {estornoRealizado && (
+              <span className="badge text-xs font-medium bg-emerald-100 text-emerald-700 whitespace-nowrap">
+                💰 Estorno Realizado
+              </span>
+            )}
+            {mostrarDecisao && (
+              <span className={`badge text-xs font-medium whitespace-nowrap ${decisaoCfg.cls}`}>
+                {decisaoCfg.label}
+              </span>
+            )}
+          </div>
+        )
+      })()}
 
       {ultimoLog && (
         <div className="border-t border-gray-100 pt-2 mt-1">
