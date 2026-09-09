@@ -39,7 +39,7 @@ export function useMetrics(dateFrom: string, dateTo: string) {
         // Busca todos os tickets do periodo
         const { data: tickets } = await db
           .from('tickets')
-          .select('id, ticket_number, order_id, company_name, merchant_name, tipo, status, created_at')
+          .select('id, ticket_number, order_id, company_name, merchant_name, tipo, status, created_at, estorno_realizado')
           .gte('created_at', since)
           .lte('created_at', until)
           .order('created_at', { ascending: false })
@@ -124,8 +124,8 @@ export function useMetrics(dateFrom: string, dateTo: string) {
 
         setSummary({
           total_tickets: tickets.length,
-          abertos: (tickets as any[]).filter((t: any) => !['encerrado', 'recusado'].includes(t.status)).length,
-          encerrados: (tickets as any[]).filter((t: any) => t.status === 'encerrado').length,
+          abertos: (tickets as any[]).filter((t: any) => !t.estorno_realizado && t.status !== 'recusado').length,
+          encerrados: (tickets as any[]).filter((t: any) => !!t.estorno_realizado).length,
           mttr_autorizacao_media_horas: mediaAut ? Math.round(mediaAut * 10) / 10 : null,
           mttr_autorizacao_media_dias: mediaAut ? Math.round(mediaAut / 24 * 10) / 10 : null,
           mttr_logistica_media_horas: mediaLog ? Math.round(mediaLog * 10) / 10 : null,
