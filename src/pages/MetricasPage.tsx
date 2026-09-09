@@ -140,7 +140,7 @@ function useRankings(dateFrom: string, dateTo: string) {
       const until = new Date(dateTo + 'T23:59:59').toISOString()
       const { data } = await (await import('@/lib/db')).db
         .from('tickets')
-        .select('merchant_name, company_name, status')
+        .select('merchant_name, company_name, status, estorno_realizado')
         .gte('created_at', since)
         .lte('created_at', until)
 
@@ -156,7 +156,7 @@ function useRankings(dateFrom: string, dateTo: string) {
         if (!sellerMap.has(sn)) sellerMap.set(sn, { name: sn, total: 0, abertos: 0, encerrados: 0, recusados: 0 })
         const s = sellerMap.get(sn)!
         s.total++
-        if (t.status === 'encerrado') s.encerrados++
+        if (t.estorno_realizado) s.encerrados++
         else if (t.status === 'recusado') s.recusados++
         else s.abertos++
 
@@ -165,7 +165,7 @@ function useRankings(dateFrom: string, dateTo: string) {
         if (!oficinaMap.has(on)) oficinaMap.set(on, { name: on, total: 0, abertos: 0, encerrados: 0, recusados: 0 })
         const o = oficinaMap.get(on)!
         o.total++
-        if (t.status === 'encerrado') o.encerrados++
+        if (t.estorno_realizado) o.encerrados++
         else if (t.status === 'recusado') o.recusados++
         else o.abertos++
       }
@@ -349,7 +349,7 @@ function useRecusasPosEstorno(dateFrom: string, dateTo: string) {
       const { count } = await db
         .from('tickets')
         .select('id', { count: 'exact', head: true })
-        .eq('status', 'encerrado')
+        .eq('estorno_realizado', true)
         .gte('created_at', since)
         .lte('created_at', until)
 
@@ -359,7 +359,7 @@ function useRecusasPosEstorno(dateFrom: string, dateTo: string) {
       const { data } = await db
         .from('tickets')
         .select('id, ticket_number, order_id, company_name, merchant_name, status, decisao_seller_data, decisao_seller_motivo, created_at')
-        .eq('status', 'encerrado')
+        .eq('estorno_realizado', true)
         .eq('decisao_seller', 'recusou')
         .gte('created_at', since)
         .lte('created_at', until)
