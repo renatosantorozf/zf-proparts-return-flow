@@ -322,7 +322,7 @@ export default function TicketPage() {
                         <span className="text-xs text-gray-400 shrink-0">{formatarDataHora(log.created_at)}</span>
                       </div>
                       <p className="text-gray-800 leading-snug">{log.mensagem}</p>
-                      {(log as any).created_by_email && log.tipo !== 'sistema' && (
+                      {(log as any).created_by_email && (
                         <p className="text-xs text-gray-400 mt-0.5">
                           por {(log as any).created_by_email.split('@')[0]}
                         </p>
