@@ -123,11 +123,24 @@ function SellerForm({ seller, onSave, onCancel }: {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    await db.from('sellers').update({
+
+    // prazo_devolucao_dias e coluna numerica no banco — string vazia quebra o update inteiro
+    const prazoStr = form.prazo_devolucao_dias?.trim()
+    const prazoNumerico = prazoStr ? Number(prazoStr) : null
+
+    const { error } = await db.from('sellers').update({
       ...form,
+      prazo_devolucao_dias: prazoNumerico,
       updated_at: new Date().toISOString()
     }).eq('id', seller.id)
+
     setSaving(false)
+
+    if (error) {
+      alert('Erro ao salvar: ' + error.message)
+      return
+    }
+
     onSave()
   }
 
