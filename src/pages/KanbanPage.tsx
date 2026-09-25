@@ -239,6 +239,20 @@ const COLUNAS_ATIVAS: TicketStatus[] = [
 export default function KanbanPage() {
   const navigate = useNavigate()
   const { tickets, loading, refetch } = useTickets()
+  const [nomeFantasiaMap, setNomeFantasiaMap] = useState<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    db.from('sellers')
+      .select('merchant_reference, nome_fantasia')
+      .not('nome_fantasia', 'is', null)
+      .then(({ data }) => {
+        const map = new Map<string, string>()
+        for (const s of (data ?? []) as any[]) {
+          if (s.nome_fantasia) map.set(s.merchant_reference, s.nome_fantasia)
+        }
+        setNomeFantasiaMap(map)
+      })
+  }, [])
   const { getSlaInfo } = useSla()
   const idsAtivosParaLog = tickets
     .filter(t => !['encerrado', 'recusado'].includes(t.status))
@@ -364,16 +378,20 @@ export default function KanbanPage() {
       }
     }
 
-    // Busca unificada: seller, cliente ou pedido
+    // Busca unificada: seller (nome da loja + nome fantasia), cliente ou pedido
     if (busca.trim()) {
       const q = busca.trim().toLowerCase()
-      base = base.filter(t =>
-        (t.merchant_name ?? '').toLowerCase().includes(q) ||
-        (t.merchant_reference ?? '').toLowerCase().includes(q) ||
-        (t.company_name ?? '').toLowerCase().includes(q) ||
-        String(t.order_id ?? '').includes(q) ||
-        String(t.ticket_number ?? '').includes(q)
-      )
+      base = base.filter(t => {
+        const nomeFantasia = nomeFantasiaMap.get(t.merchant_reference ?? '') ?? ''
+        return (
+          (t.merchant_name ?? '').toLowerCase().includes(q) ||
+          (t.merchant_reference ?? '').toLowerCase().includes(q) ||
+          nomeFantasia.toLowerCase().includes(q) ||
+          (t.company_name ?? '').toLowerCase().includes(q) ||
+          String(t.order_id ?? '').includes(q) ||
+          String(t.ticket_number ?? '').includes(q)
+        )
+      })
     }
 
     return base
