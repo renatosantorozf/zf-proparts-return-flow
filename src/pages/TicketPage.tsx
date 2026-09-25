@@ -495,11 +495,17 @@ export default function TicketPage() {
                 <textarea
                   value={motivoRecusa}
                   onChange={e => setMotivoRecusa(e.target.value)}
-                  onBlur={() => handleSetDecisaoSeller('recusou', motivoRecusa)}
                   placeholder="Descreva o motivo informado pelo seller..."
                   className="input resize-none text-xs"
                   rows={2}
                 />
+                <button
+                  onClick={() => handleSetDecisaoSeller('recusou', motivoRecusa)}
+                  disabled={savingDecisao}
+                  className="btn-primary text-xs mt-1.5"
+                >
+                  {savingDecisao ? 'Salvando...' : 'Salvar motivo'}
+                </button>
               </div>
             )}
             {(ticket as any).decisao_seller_data && (
